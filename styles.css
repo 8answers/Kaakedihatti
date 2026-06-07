@@ -397,6 +397,7 @@ body.modal-open {
   left: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 16px;
   width: 100%;
   max-width: none;
@@ -591,8 +592,9 @@ body.modal-open {
 }
 
 .ticket-card {
-  width: 100%;
+  width: fit-content;
   max-width: none;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -602,10 +604,15 @@ body.modal-open {
 }
 
 .ticket-card--overview {
-  width: 100%;
+  width: fit-content;
   background: #fff;
   color: #000;
   cursor: pointer;
+}
+
+.ticket-card--category {
+  width: 100%;
+  align-self: stretch;
 }
 
 .ticket-card__header {
@@ -640,7 +647,8 @@ body.modal-open {
 }
 
 .ticket-card__columns--overview {
-  grid-template-columns: minmax(0, 1fr) 50px 50px;
+  grid-template-columns: minmax(0, 268px) 50px 50px;
+  column-gap: 16px;
 }
 
 .ticket-card__header--new {
@@ -662,8 +670,19 @@ body.modal-open {
   line-height: 1;
 }
 
+.ticket-card--category .ticket-card__header,
+.ticket-card--category .ticket-card__columns,
+.ticket-card--category .ticket-card__name,
+.ticket-card--category .ticket-card__qty,
+.ticket-card--category .ticket-card__time,
+.ticket-card--category .ticket-card__note {
+  font-size: 24px;
+}
+
 .ticket-card__columns--category {
   align-items: center;
+  grid-template-columns: minmax(0, 1fr) 50px 274px 107px;
+  column-gap: 40px;
 }
 
 .ticket-card__column {
@@ -686,12 +705,12 @@ body.modal-open {
 }
 
 .ticket-card__column--acceptance {
-  width: 96px;
+  width: 274px;
   justify-content: center;
 }
 
 .ticket-card__column--time {
-  width: 67px;
+  width: 107px;
   justify-content: center;
 }
 
@@ -725,11 +744,14 @@ body.modal-open {
 }
 
 .ticket-card__main--overview {
-  grid-template-columns: minmax(0, 1fr) 50px 50px;
+  grid-template-columns: minmax(0, 268px) 50px 50px;
+  column-gap: 16px;
 }
 
 .ticket-card__main--category {
   align-items: center;
+  grid-template-columns: minmax(0, 1fr) 50px 274px 107px;
+  column-gap: 40px;
 }
 
 .ticket-card__name {
@@ -784,24 +806,24 @@ body.modal-open {
 }
 
 .ticket-card__acceptance {
-  width: 96px;
+  width: 274px;
   justify-self: center;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 32px;
 }
 
 .ticket-card__decision {
-  width: 18px;
-  height: 18px;
+  width: 121px;
+  height: 27px;
   border: 0;
   padding: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 12px/1 "Kulim Park", sans-serif;
+  font: 400 24px/1 "Kulim Park", sans-serif;
   color: #fff;
 }
 
@@ -817,7 +839,7 @@ body.modal-open {
   justify-self: center;
   color: #fff;
   text-align: center;
-  font-size: 16px;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -827,7 +849,7 @@ body.modal-open {
 
 .ticket-card__note {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 16px;
+  font-size: 24px;
   line-height: 1;
   overflow: hidden;
   white-space: nowrap;
@@ -835,14 +857,13 @@ body.modal-open {
 }
 
 .ticket-card__status {
-  width: 50px;
-  height: 18px;
+  height: 27px;
   border: 0;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 400 16px/1 "Kulim Park", sans-serif;
+  font: 400 24px/1 "Kulim Park", sans-serif;
   justify-self: center;
 }
 
@@ -850,21 +871,24 @@ body.modal-open {
   background: #000;
   color: #fff;
   cursor: pointer;
+  width: 100%;
 }
 
 .ticket-card__status--delivered {
   background: #0084ff;
   color: #fff;
+  width: 100%;
 }
 
 .ticket-card__status--rejected {
   background: transparent;
+  width: 121px;
   cursor: pointer;
 }
 
 .ticket-card__status-image {
-  width: 50px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   object-fit: contain;
   display: block;
 }
@@ -1446,6 +1470,13 @@ body.modal-open {
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.order-share:disabled,
+.order-share--shared {
+  background: #666;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: default;
 }
 
 .bill-shell {
@@ -2407,11 +2438,26 @@ body.modal-open {
     column-gap: 12px;
   }
 
+  .ticket-card--category .ticket-card__columns,
+  .ticket-card--category .ticket-card__main {
+    grid-template-columns: minmax(0, 1fr) 36px 160px 80px;
+    column-gap: 12px;
+  }
+
   .ticket-card__header,
   .ticket-card__columns,
   .ticket-card__name,
   .ticket-card__qty,
   .ticket-card__note {
+    font-size: 18px;
+  }
+
+  .ticket-card--category .ticket-card__header,
+  .ticket-card--category .ticket-card__columns,
+  .ticket-card--category .ticket-card__name,
+  .ticket-card--category .ticket-card__qty,
+  .ticket-card--category .ticket-card__note,
+  .ticket-card--category .ticket-card__time {
     font-size: 18px;
   }
 
@@ -2435,10 +2481,26 @@ body.modal-open {
     width: 52px;
   }
 
+  .ticket-card--category .ticket-card__column--acceptance,
+  .ticket-card--category .ticket-card__acceptance {
+    width: 160px;
+  }
+
+  .ticket-card--category .ticket-card__column--time,
+  .ticket-card--category .ticket-card__time {
+    width: 80px;
+  }
+
   .ticket-card__decision {
     width: 16px;
     height: 16px;
     font-size: 10px;
+  }
+
+  .ticket-card--category .ticket-card__decision {
+    width: 72px;
+    height: 24px;
+    font-size: 18px;
   }
 
   .ticket-card__status {
@@ -2447,9 +2509,23 @@ body.modal-open {
     font-size: 12px;
   }
 
+  .ticket-card--category .ticket-card__status {
+    height: 24px;
+    font-size: 18px;
+  }
+
+  .ticket-card--category .ticket-card__status--rejected {
+    width: 72px;
+  }
+
   .ticket-card__status-image {
     width: 36px;
     height: 16px;
+  }
+
+  .ticket-card--category .ticket-card__status-image {
+    width: 12px;
+    height: 12px;
   }
 
   .ticket-card__note-row {

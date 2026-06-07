@@ -531,6 +531,10 @@ function isPublishedOrderItem(item) {
   return Number.isFinite(item?.sharedAt);
 }
 
+function isSharedOrder(orderItems) {
+  return orderItems.length > 0 && orderItems.every((item) => isPublishedOrderItem(item));
+}
+
 function toSupabaseTimestamp(value) {
   return Number.isFinite(value) ? new Date(value).toISOString() : null;
 }
@@ -775,6 +779,11 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
   const diningTableId = await resolveDiningTableId(tableNumber);
   if (!Number.isFinite(diningTableId)) return;
 
+  const orderSharedAt = isSharedOrder(orderItems)
+    ? Math.min(...orderItems.map((item) => Number(item.sharedAt)).filter((value) => Number.isFinite(value)))
+    : null;
+  const orderStatus = isSharedOrder(orderItems) ? "shared" : "open";
+
   let orderId = existingOrderId;
   if (orderId) {
     await supabaseRequest("orders", {
@@ -787,6 +796,8 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
       body: {
         table_number: tableNumber,
         table_id: diningTableId,
+        status: orderStatus,
+        shared_at: toSupabaseTimestamp(orderSharedAt),
       },
     });
   } else {
@@ -799,6 +810,8 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
       body: {
         table_number: tableNumber,
         table_id: diningTableId,
+        status: orderStatus,
+        shared_at: toSupabaseTimestamp(orderSharedAt),
       },
     });
     orderId = orderRows?.[0]?.id || null;
@@ -1041,7 +1054,7 @@ function shareOrder() {
           sharedAt,
         },
   );
-  persistCurrentOrder();
+  renderMenu();
   renderSousChef();
   renderTickets();
 
@@ -1104,8 +1117,57 @@ function buildEditIconMarkup() {
 
 function buildRefreshIconMarkup() {
   return `
-    <img class="ticket-card__status-image" src="./Refresh.png" alt="" aria-hidden="true" />
+    <img class="ticket-card__status-image bill-item__status-image" src="./Refresh.png" alt="" aria-hidden="true" />
   `;
+}
+
+function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex) {
+  if (item.acceptance === "out") {
+    return `
+      <button
+        class="ticket-card__status bill-item__status bill-item__status--out"
+        type="button"
+        data-ticket-deliver="${rowIndex}"
+        data-ticket-table="${escapeHtml(String(rowTableNumber))}"
+        aria-label="Mark ${escapeHtml(item.dishName)} as delivered"
+      >Out</button>`;
+  }
+
+  if (item.acceptance === "delivered") {
+    return `
+      <div class="ticket-card__status bill-item__status bill-item__status--delivered" aria-hidden="true">
+        DLV
+      </div>`;
+  }
+
+  if (item.acceptance === "rejected") {
+    return `
+      <button
+        class="ticket-card__status bill-item__status bill-item__status--rejected"
+        type="button"
+        data-ticket-reset="${rowIndex}"
+        data-ticket-table="${escapeHtml(String(rowTableNumber))}"
+        aria-label="Reset ${escapeHtml(item.dishName)}"
+      >${buildRefreshIconMarkup()}</button>`;
+  }
+
+  return `
+    <div class="bill-item__acceptance ticket-card__acceptance">
+      <button
+        class="bill-item__accept bill-item__accept--reject"
+        type="button"
+        data-ticket-reject="${rowIndex}"
+        data-ticket-table="${escapeHtml(String(rowTableNumber))}"
+        aria-label="Reject ${escapeHtml(item.dishName)}"
+      >×</button>
+      <button
+        class="bill-item__accept bill-item__accept--accept"
+        type="button"
+        data-ticket-accept="${rowIndex}"
+        data-ticket-table="${escapeHtml(String(rowTableNumber))}"
+        aria-label="Accept ${escapeHtml(item.dishName)}"
+      >✓</button>
+    </div>`;
 }
 
 function getTicketDataForOrder(tableNumber, orderItems) {
@@ -1282,48 +1344,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
                     <span class="ticket-card__dish">${escapeHtml(item.dishName)}</span>
                   </div>
                   <div class="ticket-card__qty">${escapeHtml(String(item.quantity))}</div>
-                  ${
-                    item.acceptance === "out"
-                      ? `
-                        <button
-                          class="ticket-card__status ticket-card__status--out"
-                          type="button"
-                          data-ticket-deliver="${rowIndex}"
-                          data-ticket-table="${escapeHtml(String(rowTableNumber))}"
-                          aria-label="Mark ${escapeHtml(item.dishName)} as delivered"
-                        >Out</button>`
-                      : item.acceptance === "delivered"
-                        ? `
-                          <div class="ticket-card__status ticket-card__status--delivered" aria-hidden="true">
-                            DLV
-                          </div>`
-                        : item.acceptance === "rejected"
-                          ? `
-                            <button
-                              class="ticket-card__status ticket-card__status--rejected"
-                              type="button"
-                              data-ticket-reset="${rowIndex}"
-                              data-ticket-table="${escapeHtml(String(rowTableNumber))}"
-                              aria-label="Reset ${escapeHtml(item.dishName)}"
-                            >${buildRefreshIconMarkup()}</button>`
-                          : `
-                            <div class="ticket-card__acceptance">
-                              <button
-                                class="ticket-card__decision ticket-card__decision--reject"
-                                type="button"
-                                data-ticket-reject="${rowIndex}"
-                                data-ticket-table="${escapeHtml(String(rowTableNumber))}"
-                                aria-label="Reject ${escapeHtml(item.dishName)}"
-                              >×</button>
-                              <button
-                                class="ticket-card__decision ticket-card__decision--accept"
-                                type="button"
-                                data-ticket-accept="${rowIndex}"
-                                data-ticket-table="${escapeHtml(String(rowTableNumber))}"
-                                aria-label="Accept ${escapeHtml(item.dishName)}"
-                              >✓</button>
-                            </div>`
-                  }
+                  ${buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex)}
                   <div class="ticket-card__time" data-ticket-time>
                     ${escapeHtml(formatElapsedTime(Date.now() - rowReceivedAt))}
                   </div>
@@ -1624,6 +1645,7 @@ function renderCategory(categoryData, isOpen, visibleItems, itemCount) {
 function renderMenu() {
   const searchTerm = state.search.trim().toLowerCase();
   const hasSearch = searchTerm.length > 0;
+  const orderIsShared = isSharedOrder(state.order);
 
   if (elements.menuTitle) {
     elements.menuTitle.textContent = `Table ${state.tableNumber} Order (Captain)`;
@@ -1719,6 +1741,13 @@ function renderMenu() {
   if (elements.orderFooter) {
     elements.orderFooter.hidden = state.order.length === 0;
     elements.orderFooter.style.display = state.order.length > 0 ? "flex" : "none";
+  }
+
+  if (elements.orderShare) {
+    elements.orderShare.disabled = orderIsShared;
+    elements.orderShare.textContent = orderIsShared ? "Shared" : "Share";
+    elements.orderShare.classList.toggle("order-share--shared", orderIsShared);
+    elements.orderShare.setAttribute("aria-disabled", orderIsShared ? "true" : "false");
   }
 
   persistCurrentOrder();
