@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kake di Hatti</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kulim+Park:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <section class="screen" data-page="home">
+        <header class="topbar" aria-label="Home">
+          <span class="topbar__title">Home</span>
+        </header>
+
+        <main class="content content--home" aria-label="Role selection">
+          <div class="role-stack">
+            <button class="role-button" type="button">Admin</button>
+            <button class="role-button" type="button" data-nav="captain">
+              Captain
+            </button>
+            <button class="role-button" type="button" data-nav="sous-chef">
+              (Sous Chef/Expeditor)
+            </button>
+            <button class="role-button" type="button" data-nav="cashier">
+              Cashier
+            </button>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen" data-page="captain" hidden>
+        <header class="topbar topbar--captain" aria-label="Table Overview (Captain)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="home"
+            aria-label="Back to home"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title">Table Overview (Captain)</span>
+        </header>
+
+        <main class="content content--captain" aria-label="Table overview">
+          <div class="table-grid">
+            <button class="table-tile" type="button">1</button>
+            <button class="table-tile" type="button">2</button>
+            <button class="table-tile" type="button">3</button>
+            <button class="table-tile" type="button">4</button>
+            <button class="table-tile" type="button">5</button>
+            <button class="table-tile" type="button">6</button>
+            <button class="table-tile" type="button">7</button>
+            <button class="table-tile" type="button">8</button>
+            <button class="table-tile" type="button">9</button>
+            <button class="table-tile" type="button">10</button>
+            <button class="table-tile" type="button">11</button>
+            <button class="table-tile" type="button">12</button>
+            <button class="table-tile" type="button">13</button>
+            <button class="table-tile" type="button">14</button>
+            <button class="table-tile" type="button">15</button>
+            <button class="table-tile" type="button">16</button>
+            <button class="table-tile" type="button">17</button>
+            <button class="table-tile" type="button">18</button>
+            <button class="table-tile" type="button">19</button>
+            <button class="table-tile" type="button">20</button>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen" data-page="cashier" hidden>
+        <header class="topbar topbar--captain" aria-label="Table Overview (Cashier)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="home"
+            aria-label="Back to home"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title">Table Overview (Cashier)</span>
+        </header>
+
+        <main class="content content--captain" aria-label="Cashier table overview">
+          <div class="table-grid">
+            <button class="table-tile" type="button">1</button>
+            <button class="table-tile" type="button">2</button>
+            <button class="table-tile" type="button">3</button>
+            <button class="table-tile" type="button">4</button>
+            <button class="table-tile" type="button">5</button>
+            <button class="table-tile" type="button">6</button>
+            <button class="table-tile" type="button">7</button>
+            <button class="table-tile" type="button">8</button>
+            <button class="table-tile" type="button">9</button>
+            <button class="table-tile" type="button">10</button>
+            <button class="table-tile" type="button">11</button>
+            <button class="table-tile" type="button">12</button>
+            <button class="table-tile" type="button">13</button>
+            <button class="table-tile" type="button">14</button>
+            <button class="table-tile" type="button">15</button>
+            <button class="table-tile" type="button">16</button>
+            <button class="table-tile" type="button">17</button>
+            <button class="table-tile" type="button">18</button>
+            <button class="table-tile" type="button">19</button>
+            <button class="table-tile" type="button">20</button>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen screen--sous-chef" data-page="sous-chef" hidden>
+        <header class="topbar topbar--captain" aria-label="Table Overview (Sous Chef/Expeditor)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="home"
+            aria-label="Back to home"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title topbar__title--mixed" aria-label="Table Overview (Sous Chef/Expeditor)">
+            <span class="topbar__title-strong">Table Overview</span>
+            <span> (Sous Chef/Expeditor)</span>
+          </span>
+        </header>
+
+        <main class="content content--sous-chef" aria-label="Table overview">
+          <div class="sous-chef-shell" data-sous-chef-shell>
+            <div class="table-grid table-grid--sous-chef" data-sous-chef-table-grid>
+              <button class="table-tile" type="button">1</button>
+              <button class="table-tile" type="button">2</button>
+              <button class="table-tile" type="button">3</button>
+              <button class="table-tile" type="button">4</button>
+              <button class="table-tile" type="button">5</button>
+              <button class="table-tile" type="button">6</button>
+              <button class="table-tile" type="button">7</button>
+              <button class="table-tile" type="button">8</button>
+              <button class="table-tile" type="button">9</button>
+              <button class="table-tile" type="button">10</button>
+              <button class="table-tile" type="button">11</button>
+              <button class="table-tile" type="button">12</button>
+              <button class="table-tile" type="button">13</button>
+              <button class="table-tile" type="button">14</button>
+              <button class="table-tile" type="button">15</button>
+              <button class="table-tile" type="button">16</button>
+              <button class="table-tile" type="button">17</button>
+              <button class="table-tile" type="button">18</button>
+              <button class="table-tile" type="button">19</button>
+              <button class="table-tile" type="button">20</button>
+            </div>
+
+            <div class="sous-chef-divider" aria-hidden="true">
+              <button
+                class="sous-chef-divider__handle"
+                type="button"
+                data-sous-chef-collapse-toggle
+                aria-label="Toggle table overview sidebar"
+              >
+                <img
+                  src="./Collapse.png"
+                  alt=""
+                  aria-hidden="true"
+                  data-sous-chef-collapse-icon
+                />
+              </button>
+            </div>
+
+            <aside class="sous-chef-sidebar" data-sous-chef-sidebar aria-label="Live category wise">
+              <div class="sous-chef-sidebar__row sous-chef-sidebar__row--tables">
+                <span class="sous-chef-sidebar__icon" aria-hidden="true">‹</span>
+                <span class="sous-chef-sidebar__label">Tables</span>
+              </div>
+              <button
+                class="sous-chef-sidebar__row sous-chef-sidebar__row--tickets"
+                type="button"
+                data-nav="tickets"
+                data-sous-chef-tickets-row
+              >
+                Tickets (0)
+              </button>
+              <div class="sous-chef-sidebar__heading">Live Category Wise</div>
+              <div class="sous-chef-sidebar__categories" data-sous-chef-live-categories hidden></div>
+              <div class="sous-chef-sidebar__empty" data-sous-chef-live-empty>NA</div>
+            </aside>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen screen--tickets" data-page="tickets" hidden>
+        <header class="topbar topbar--captain" aria-label="Tickets Overview (Sous Chef/Expeditor)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="sous-chef"
+            aria-label="Back to table overview"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title topbar__title--mixed" aria-label="Tickets Overview (Sous Chef/Expeditor)">
+            <span class="topbar__title-strong">Tickets Overview</span>
+            <span> (Sous Chef/Expeditor)</span>
+          </span>
+        </header>
+
+        <main class="content content--tickets" aria-label="Tickets overview">
+          <div class="tickets-shell" data-tickets-shell>
+            <div class="tickets-canvas">
+              <div class="tickets-list" data-tickets-list></div>
+              <div class="tickets-empty" data-tickets-empty hidden>NA</div>
+            </div>
+
+            <div class="tickets-divider">
+              <button
+                class="tickets-divider__handle"
+                type="button"
+                data-tickets-collapse-toggle
+                aria-label="Toggle tickets overview"
+              >
+                <img
+                  src="./Collapse.png"
+                  alt=""
+                  aria-hidden="true"
+                  data-tickets-collapse-icon
+                />
+              </button>
+            </div>
+
+            <aside class="tickets-sidebar" data-tickets-sidebar aria-label="Live category wise">
+              <button class="tickets-sidebar__row tickets-sidebar__row--tables" type="button" data-tickets-tables-row>
+                <span class="tickets-sidebar__label">Tables</span>
+              </button>
+              <button class="tickets-sidebar__row tickets-sidebar__row--tickets" type="button" data-tickets-count-row>
+                <span class="tickets-sidebar__icon" aria-hidden="true">‹</span>
+                <span data-tickets-count>Tickets (0)</span>
+              </button>
+              <div class="tickets-sidebar__heading">Live Category Wise</div>
+              <div class="tickets-sidebar__categories" data-tickets-live-categories hidden></div>
+              <div class="tickets-sidebar__empty" data-tickets-live-empty>NA</div>
+            </aside>
+          </div>
+        </main>
+      </section>
+
+      <div class="tickets-action-popup" data-tickets-action-popup hidden aria-hidden="true">
+        <div class="tickets-action-popup__card" role="dialog" aria-modal="true" aria-labelledby="tickets-action-title">
+          <div class="tickets-action-popup__header">
+            <div class="tickets-action-popup__title" id="tickets-action-title" data-tickets-action-title>Acceptance</div>
+            <button
+              class="tickets-action-popup__close"
+              type="button"
+              data-tickets-action-close
+              aria-label="Close popup"
+            >
+              <svg viewBox="0 0 10 10" role="presentation" focusable="false" aria-hidden="true">
+                <path d="M1 1l8 8M9 1L1 9"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="tickets-action-popup__actions" data-tickets-action-actions></div>
+        </div>
+      </div>
+
+      <section class="screen screen--bill" data-page="bill" hidden>
+        <header class="topbar topbar--menu" aria-label="Table Order (Bill)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="sous-chef"
+            aria-label="Back to table overview"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title" data-bill-title>Table 5 Order (Bill)</span>
+        </header>
+
+        <main class="content content--bill" aria-label="Bill view">
+          <div class="bill-shell">
+            <section class="bill-panel" data-bill-empty hidden aria-label="Order">
+              <div class="bill-panel__header">Order</div>
+              <div class="bill-panel__body bill-panel__body--empty">
+                <div class="bill-empty">NA</div>
+              </div>
+            </section>
+
+            <section class="bill-panel" data-bill-filled hidden aria-label="Current order">
+              <div class="bill-panel__header">Current Order</div>
+              <div class="bill-panel__body">
+                <div class="bill-columns" data-bill-columns aria-hidden="true">
+                  <div class="bill-columns__item bill-columns__item--items">Items</div>
+                  <div class="bill-columns__item bill-columns__item--qty">Qty</div>
+                  <div class="bill-columns__item bill-columns__item--acceptance">Acceptance</div>
+                  <div class="bill-columns__item bill-columns__item--time">Time</div>
+                </div>
+                <div class="bill-list-wrap">
+                  <ul class="bill-list" data-bill-list></ul>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="bill-delivery-popup" data-bill-delivery-popup hidden aria-hidden="true">
+            <div class="bill-delivery-popup__card" role="dialog" aria-modal="true" aria-labelledby="bill-delivery-title">
+              <div class="bill-delivery-popup__header">
+                <div class="bill-delivery-popup__title" id="bill-delivery-title">Delivered?</div>
+                <button
+                  class="bill-delivery-popup__close"
+                  type="button"
+                  data-bill-delivery-close
+                  aria-label="Close delivery popup"
+                >
+                  ×
+                </button>
+              </div>
+              <button class="bill-delivery-popup__yes" type="button" data-bill-delivery-yes>
+                Yes
+              </button>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen screen--menu" data-page="menu" hidden>
+        <header class="topbar topbar--menu" aria-label="Table Order">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="captain"
+            aria-label="Back to tables"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title" data-menu-title>Table Order (Captain)</span>
+        </header>
+
+        <main class="content content--menu" aria-label="Menu and current order">
+          <div class="menu-shell">
+            <section class="menu-panel menu-panel--items" aria-label="Menu items">
+              <div class="menu-panel__header">Menu Items</div>
+              <div class="menu-panel__body menu-panel__body--items">
+                <label class="search-field">
+                  <span class="sr-only">Search menu</span>
+                  <input
+                    type="search"
+                    placeholder="Search"
+                    autocomplete="off"
+                    data-menu-search
+                  />
+                  <span class="search-field__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                      <circle cx="11" cy="11" r="6.5"></circle>
+                      <path d="M16 16l4 4"></path>
+                    </svg>
+                  </span>
+                </label>
+                <div class="category-list" data-category-list></div>
+              </div>
+            </section>
+
+            <div class="menu-divider" aria-hidden="true"></div>
+
+            <section class="menu-panel menu-panel--order" aria-label="Current order">
+              <div class="menu-panel__header">Current Order</div>
+              <div class="menu-panel__body menu-panel__body--order">
+                <div class="order-columns" data-order-columns aria-hidden="true"></div>
+                <div class="order-content" data-order-content>
+                  <div class="order-empty" data-order-empty>NA</div>
+                  <ul class="order-list" data-order-list hidden></ul>
+                </div>
+                <div class="order-footer" data-order-footer hidden>
+                  <button class="order-share" type="button" data-order-share>
+                    Share
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="dish-modal" data-dish-modal hidden aria-hidden="true">
+            <div
+              class="dish-modal__dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dish-modal-title"
+            >
+              <div class="dish-modal__header">
+                <div class="dish-modal__title" id="dish-modal-title" data-dish-modal-title>
+                  Tomato Soup
+                </div>
+                <button
+                class="dish-modal__close"
+                type="button"
+                data-dish-modal-close
+                aria-label="Close popup"
+              >
+                  <svg viewBox="0 0 10.486 10.486" aria-hidden="true" focusable="false">
+                    <path
+                      d="M5.243 5.243l-5.243 5.243m5.242-5.243l5.244-5.243m-10.486 0l5.242 5.243m5.244 5.243l-5.243-5.243"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+
+              <textarea
+                class="dish-modal__note"
+                data-dish-modal-note
+                placeholder="Custom"
+                aria-label="Custom note"
+              ></textarea>
+
+              <div class="dish-modal__quantity" aria-label="Quantity selector">
+                <button
+                  class="dish-modal__step"
+                  type="button"
+                  data-dish-modal-step="-1"
+                  aria-label="Decrease quantity"
+                >
+                  <svg viewBox="0 0 11.2 3.2" aria-hidden="true" focusable="false">
+                    <path d="M11.2 3.2l-11.2 0 0-3.2 11.2 0 0 3.2z"></path>
+                  </svg>
+                </button>
+                <div class="dish-modal__count" data-dish-modal-quantity>1</div>
+                <button
+                  class="dish-modal__step"
+                  type="button"
+                  data-dish-modal-step="1"
+                  aria-label="Increase quantity"
+                >
+                  <svg viewBox="0 0 15.84 15.84" aria-hidden="true" focusable="false">
+                    <path
+                      d="M15.84 9.536l-15.84 0 0-3.2 15.84 0 0 3.2z m-6.304-9.536l0 15.84-3.2 0 0-15.84 3.2 0z"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="dish-modal__actions" data-dish-modal-actions>
+                <button class="dish-modal__add" type="button" data-dish-modal-add>
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
