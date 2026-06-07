@@ -364,7 +364,17 @@
             <div class="menu-divider" aria-hidden="true"></div>
 
             <section class="menu-panel menu-panel--order" aria-label="Current order">
-              <div class="menu-panel__header">Current Order</div>
+              <div class="menu-panel__header menu-panel__header--order">
+                <span>Current Order</span>
+                <button
+                  class="menu-panel__header-action"
+                  type="button"
+                  data-order-new
+                  hidden
+                >
+                  New
+                </button>
+              </div>
               <div class="menu-panel__body menu-panel__body--order">
                 <div class="order-columns" data-order-columns aria-hidden="true"></div>
                 <div class="order-content" data-order-content>

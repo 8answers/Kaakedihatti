@@ -104,27 +104,27 @@ body.modal-open {
 .content--captain {
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 8px 8px 0;
+  padding: 16px 8px 0;
 }
 
 .content--menu {
   align-items: stretch;
   justify-content: stretch;
-  padding: 27px 0 0;
+  padding: 16px 0 0;
   position: relative;
 }
 
 .content--bill {
   align-items: stretch;
   justify-content: stretch;
-  padding: 32px 0 0;
+  padding: 16px 0 0;
   position: relative;
 }
 
 .content--sous-chef {
   align-items: stretch;
   justify-content: stretch;
-  padding: 32px 0 0;
+  padding: 16px 0 0;
   position: relative;
 }
 
@@ -207,6 +207,18 @@ body.modal-open {
   cursor: pointer;
 }
 
+.table-tile--live,
+.table-tile--live:hover {
+  background: #009e12;
+  color: #fff;
+}
+
+.table-tile--preparing,
+.table-tile--preparing:hover {
+  background: #c7ae0c;
+  color: #fff;
+}
+
 .table-grid--sous-chef .table-tile {
   cursor: default;
 }
@@ -219,6 +231,13 @@ body.modal-open {
 .table-grid--sous-chef .table-tile--live,
 .table-grid--sous-chef .table-tile--live:hover {
   background: #009e12;
+  color: #fff;
+  cursor: pointer;
+}
+
+.table-grid--sous-chef .table-tile--preparing,
+.table-grid--sous-chef .table-tile--preparing:hover {
+  background: #c7ae0c;
   color: #fff;
   cursor: pointer;
 }
@@ -299,6 +318,7 @@ body.modal-open {
 
 .sous-chef-sidebar__row,
 .sous-chef-sidebar__heading {
+  height: 40px;
   min-height: 40px;
   padding: 8px 24px;
   font-size: 24px;
@@ -327,6 +347,7 @@ body.modal-open {
 }
 
 .sous-chef-sidebar__empty {
+  height: 40px;
   min-height: 40px;
   padding: 8px 24px;
   display: flex;
@@ -345,7 +366,13 @@ body.modal-open {
 
 .sous-chef-sidebar__row {
   appearance: none;
+  -webkit-appearance: none;
   border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background-image: none;
+  background-clip: padding-box;
+  outline: none;
   font: inherit;
   cursor: pointer;
   text-align: inherit;
@@ -354,7 +381,7 @@ body.modal-open {
 .content--tickets {
   align-items: stretch;
   justify-content: stretch;
-  padding: 32px 0 0;
+  padding: 16px 0 0;
   position: relative;
 }
 
@@ -481,6 +508,7 @@ body.modal-open {
 
 .tickets-sidebar__row,
 .tickets-sidebar__heading {
+  height: 40px;
   min-height: 40px;
   padding: 8px 24px;
   font-size: 24px;
@@ -554,6 +582,7 @@ body.modal-open {
 }
 
 .tickets-sidebar__empty {
+  height: 40px;
   min-height: 40px;
   padding: 8px 24px;
   display: flex;
@@ -780,6 +809,27 @@ body.modal-open {
   height: 16px;
 }
 
+.ticket-card--overview .ticket-card__status {
+  width: 50px;
+  height: 18px;
+  font-size: 16px;
+}
+
+.ticket-card--overview .ticket-card__status--out,
+.ticket-card--overview .ticket-card__status--delivered {
+  width: 50px;
+}
+
+.ticket-card--overview .ticket-card__status--rejected {
+  width: 50px;
+  background: #666;
+}
+
+.ticket-card--overview .ticket-card__status-image {
+  width: 12px;
+  height: 12px;
+}
+
 .ticket-card--overview .order-item__note-row {
   padding: 0 24px 0 52px;
 }
@@ -941,7 +991,11 @@ body.modal-open {
   color: #000;
 }
 
-.tickets-shell--collapsed .ticket-card {
+.tickets-shell--collapsed .ticket-card--overview {
+  width: fit-content;
+}
+
+.tickets-shell--collapsed .ticket-card--category {
   width: 100%;
 }
 
@@ -1112,6 +1166,36 @@ body.modal-open {
   color: #fff;
   font-size: 24px;
   line-height: 1;
+}
+
+.menu-panel__header--order {
+  position: relative;
+}
+
+.menu-panel__header-action {
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  min-width: 74px;
+  height: 32px;
+  border: 0;
+  background: #fff;
+  color: #000;
+  font: 700 16px/1 "Kulim Park", sans-serif;
+  padding: 0 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-panel__header-action[hidden] {
+  display: none !important;
+}
+
+.menu-panel__header-action:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .menu-panel__body {
@@ -2266,7 +2350,12 @@ body.modal-open {
     width: 100%;
   }
 
-  .tickets-shell--collapsed .ticket-card {
+  .tickets-shell--collapsed .ticket-card--overview {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .tickets-shell--collapsed .ticket-card--category {
     width: 100%;
   }
 
@@ -2421,7 +2510,12 @@ body.modal-open {
     width: 100%;
   }
 
-  .tickets-shell--collapsed .ticket-card {
+  .tickets-shell--collapsed .ticket-card--overview {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .tickets-shell--collapsed .ticket-card--category {
     width: 100%;
   }
 
@@ -2552,6 +2646,15 @@ body.modal-open {
   .menu-panel__header {
     min-height: 40px;
     font-size: 18px;
+  }
+
+  .menu-panel__header-action {
+    top: 4px;
+    right: 12px;
+    min-width: 64px;
+    height: 28px;
+    padding: 0 12px;
+    font-size: 14px;
   }
 
   .search-field input {

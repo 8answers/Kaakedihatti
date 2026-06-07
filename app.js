@@ -359,6 +359,7 @@ const pages = new Map(
 const elements = {
   navButtons: document.querySelectorAll("[data-nav]"),
   tableButtons: document.querySelectorAll(".table-tile"),
+  captainTableGrid: document.querySelector('[data-page="captain"] .table-grid'),
   menuTitle: document.querySelector("[data-menu-title]"),
   menuSearch: document.querySelector("[data-menu-search]"),
   categoryList: document.querySelector("[data-category-list]"),
@@ -401,6 +402,7 @@ const elements = {
   orderList: document.querySelector("[data-order-list]"),
   orderFooter: document.querySelector("[data-order-footer]"),
   orderShare: document.querySelector("[data-order-share]"),
+  orderNew: document.querySelector("[data-order-new]"),
   dishModal: document.querySelector("[data-dish-modal]"),
   dishModalTitle: document.querySelector("[data-dish-modal-title]"),
   dishModalNote: document.querySelector("[data-dish-modal-note]"),
@@ -414,6 +416,7 @@ const state = {
   search: "",
   expandedCategories: new Set(),
   tableOrders: new Map(),
+  captainDraftStartedAtByTable: new Map(),
   diningTableIdsByNumber: new Map(),
   diningTableNumbersById: new Map(),
   order: [],
@@ -535,6 +538,62 @@ function isSharedOrder(orderItems) {
   return orderItems.length > 0 && orderItems.every((item) => isPublishedOrderItem(item));
 }
 
+function getCaptainDraftStartedAt(tableNumber) {
+  return state.captainDraftStartedAtByTable.get(tableNumber) || null;
+}
+
+function isCaptainDraftSessionItem(item, draftStartedAt) {
+  if (!Number.isFinite(draftStartedAt)) return true;
+
+  const receivedAt = Number.isFinite(item?.receivedAt) ? item.receivedAt : null;
+  const sharedAt = Number.isFinite(item?.sharedAt) ? item.sharedAt : null;
+
+  return (
+    (receivedAt !== null && receivedAt >= draftStartedAt) ||
+    (sharedAt !== null && sharedAt >= draftStartedAt)
+  );
+}
+
+function getOrderItemTimerStopAt(item) {
+  return item?.acceptance === "delivered" && Number.isFinite(item.deliveredAt)
+    ? item.deliveredAt
+    : null;
+}
+
+function getOrderItemElapsedTime(item, fallbackReceivedAt = Date.now()) {
+  const receivedAt = Number.isFinite(item?.receivedAt) ? item.receivedAt : fallbackReceivedAt;
+  const stoppedAt = getOrderItemTimerStopAt(item);
+  return formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : Date.now()) - receivedAt);
+}
+
+function getTableVisualState(tableNumber, { publishedOnly = false } = {}) {
+  const orderItems = state.tableOrders.get(tableNumber) || [];
+  const activeItems = orderItems.filter((item) => {
+    if (publishedOnly && !isPublishedOrderItem(item)) return false;
+    return item.acceptance !== "delivered";
+  });
+
+  if (!activeItems.length) return "empty";
+
+  const hasPreparingItem = activeItems.some(
+    (item) => item.acceptance === "out" || item.acceptance === "accepted",
+  );
+  return hasPreparingItem ? "preparing" : "live";
+}
+
+function applyTableVisualState(button, visualState, tableNumber) {
+  button.classList.toggle("table-tile--live", visualState === "live");
+  button.classList.toggle("table-tile--preparing", visualState === "preparing");
+  button.setAttribute(
+    "aria-label",
+    visualState === "preparing"
+      ? `Table ${tableNumber}, preparing order`
+      : visualState === "live"
+        ? `Table ${tableNumber}, new order`
+        : `Table ${tableNumber}`,
+  );
+}
+
 function toSupabaseTimestamp(value) {
   return Number.isFinite(value) ? new Date(value).toISOString() : null;
 }
@@ -616,6 +675,9 @@ function mapDbOrderItem(row) {
             : null,
     receivedAt: fromSupabaseTimestamp(row.received_at) ?? Date.now(),
     sharedAt: fromSupabaseTimestamp(row.shared_at),
+    outAt: fromSupabaseTimestamp(row.out_at),
+    rejectedAt: fromSupabaseTimestamp(row.rejected_at),
+    deliveredAt: fromSupabaseTimestamp(row.delivered_at),
   };
 }
 
@@ -633,6 +695,9 @@ function mapOrderItemForDb(item, sortOrder) {
           : "pending",
     shared_at: toSupabaseTimestamp(item.sharedAt),
     received_at: toSupabaseTimestamp(item.receivedAt) || new Date().toISOString(),
+    out_at: toSupabaseTimestamp(item.outAt),
+    rejected_at: toSupabaseTimestamp(item.rejectedAt),
+    delivered_at: toSupabaseTimestamp(item.deliveredAt),
     sort_order: sortOrder,
   };
 }
@@ -858,12 +923,33 @@ function isOrderRoute(pageName) {
 function persistCurrentOrder() {
   if (!isOrderRoute(state.page)) return;
   const snapshot = cloneOrderItems(state.order);
+  const draftStartedAt = getCaptainDraftStartedAt(state.tableNumber);
+
+  if (Number.isFinite(draftStartedAt)) {
+    const preservedSharedItems = cloneOrderItems(state.tableOrders.get(state.tableNumber) || []).filter(
+      (item) =>
+        isPublishedOrderItem(item) &&
+        Number.isFinite(item.sharedAt) &&
+        item.sharedAt < draftStartedAt,
+    );
+    const mergedOrderItems = [...preservedSharedItems, ...snapshot];
+    state.tableOrders.set(state.tableNumber, mergedOrderItems);
+    enqueueDatabaseWrite(() => persistOrderToDatabase(state.tableNumber, mergedOrderItems));
+    return;
+  }
+
   state.tableOrders.set(state.tableNumber, snapshot);
   enqueueDatabaseWrite(() => persistOrderToDatabase(state.tableNumber, snapshot));
 }
 
 function loadOrderForTable(tableNumber) {
-  state.order = cloneOrderItems(state.tableOrders.get(tableNumber) || []).map((item) => ({
+  const draftStartedAt = getCaptainDraftStartedAt(tableNumber);
+  const storedOrderItems = cloneOrderItems(state.tableOrders.get(tableNumber) || []);
+  const visibleOrderItems = Number.isFinite(draftStartedAt)
+    ? storedOrderItems.filter((item) => isCaptainDraftSessionItem(item, draftStartedAt))
+    : storedOrderItems;
+
+  state.order = visibleOrderItems.map((item) => ({
     ...item,
     acceptance:
       item.acceptance === "accepted"
@@ -942,6 +1028,9 @@ function confirmDishPopup() {
       ? state.selectedDishReceivedAt
       : Date.now(),
     sharedAt: Number.isFinite(existingOrderItem?.sharedAt) ? existingOrderItem.sharedAt : null,
+    outAt: Number.isFinite(existingOrderItem?.outAt) ? existingOrderItem.outAt : null,
+    rejectedAt: Number.isFinite(existingOrderItem?.rejectedAt) ? existingOrderItem.rejectedAt : null,
+    deliveredAt: Number.isFinite(existingOrderItem?.deliveredAt) ? existingOrderItem.deliveredAt : null,
   };
 
   if (
@@ -1055,6 +1144,7 @@ function shareOrder() {
         },
   );
   renderMenu();
+  renderCaptain();
   renderSousChef();
   renderTickets();
 
@@ -1069,6 +1159,23 @@ function shareOrder() {
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(orderSummary).catch(() => {});
   }
+}
+
+function startNewOrder() {
+  if (!state.order.length) return;
+
+  state.captainDraftStartedAtByTable.set(state.tableNumber, Date.now());
+  state.order = [];
+  state.selectedDish = null;
+  state.selectedDishQuantity = 1;
+  state.selectedDishNote = "";
+  state.selectedDishReceivedAt = null;
+  state.editingOrderIndex = null;
+  persistCurrentOrder();
+  renderMenu();
+  renderCaptain();
+  renderSousChef();
+  renderTickets();
 }
 
 function buildOrderColumnsMarkup() {
@@ -1171,12 +1278,13 @@ function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex) {
 }
 
 function getTicketDataForOrder(tableNumber, orderItems) {
-  const visibleItems = orderItems.filter(
-    (item) => isPublishedOrderItem(item) && item.acceptance !== "delivered",
-  );
-  if (!visibleItems.length) return null;
+  const publishedItems = orderItems
+    .map((item, orderIndex) => ({ ...item, orderIndex }))
+    .filter((item) => isPublishedOrderItem(item));
+  const activeItems = publishedItems.filter((item) => item.acceptance !== "delivered");
+  if (!activeItems.length) return null;
 
-  const receivedAt = visibleItems.reduce((earliest, item) => {
+  const receivedAt = activeItems.reduce((earliest, item) => {
     const itemReceivedAt = Number.isFinite(item.sharedAt)
       ? item.sharedAt
       : Number.isFinite(item.receivedAt)
@@ -1188,7 +1296,7 @@ function getTicketDataForOrder(tableNumber, orderItems) {
   const categories = [];
   const seenCategoryNames = new Set();
 
-  for (const item of visibleItems) {
+  for (const item of activeItems) {
     if (seenCategoryNames.has(item.categoryName)) continue;
     seenCategoryNames.add(item.categoryName);
     categories.push(item.categoryName);
@@ -1196,10 +1304,10 @@ function getTicketDataForOrder(tableNumber, orderItems) {
 
   return {
     tableNumber,
-    items: visibleItems,
+    items: publishedItems,
     categories,
     receivedAt: Number.isFinite(receivedAt) ? receivedAt : Date.now(),
-    isNew: visibleItems.every((item) => !item.acceptance),
+    isNew: activeItems.every((item) => !item.acceptance),
   };
 }
 
@@ -1245,12 +1353,16 @@ function getCategoryTicketData(activeTickets, categoryName) {
 
   const rows = [];
   let earliestReceivedAt = Number.POSITIVE_INFINITY;
+  let hasActiveRows = false;
 
   for (const ticket of activeTickets) {
     ticket.items.forEach((item, itemIndex) => {
-      if (item.acceptance === "delivered") return;
       if (!isPublishedOrderItem(item)) return;
       if (normalizeTicketCategoryName(item.categoryName) !== normalizedCategoryName) return;
+
+      if (item.acceptance !== "delivered") {
+        hasActiveRows = true;
+      }
 
       const receivedAt = Number.isFinite(item.sharedAt)
         ? item.sharedAt
@@ -1261,13 +1373,13 @@ function getCategoryTicketData(activeTickets, categoryName) {
       rows.push({
         ...item,
         tableNumber: ticket.tableNumber,
-        orderIndex: itemIndex,
+        orderIndex: Number.isInteger(item.orderIndex) ? item.orderIndex : itemIndex,
         receivedAt,
       });
     });
   }
 
-  if (!rows.length) return null;
+  if (!rows.length || !hasActiveRows) return null;
 
   rows.sort((left, right) => {
     const leftReceivedAt = Number.isFinite(left.receivedAt) ? left.receivedAt : 0;
@@ -1282,7 +1394,7 @@ function getCategoryTicketData(activeTickets, categoryName) {
     items: rows,
     categories: [categoryName],
     receivedAt: Number.isFinite(earliestReceivedAt) ? earliestReceivedAt : Date.now(),
-    isNew: rows.every((item) => !item.acceptance),
+    isNew: rows.filter((item) => item.acceptance !== "delivered").every((item) => !item.acceptance),
   };
 }
 
@@ -1324,6 +1436,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
             const rowReceivedAt = Number.isFinite(item.receivedAt)
               ? item.receivedAt
               : ticketData.receivedAt;
+            const rowStoppedAt = getOrderItemTimerStopAt(item);
             const itemClassName =
               item.acceptance === "out"
                 ? "ticket-card__item ticket-card__item--out"
@@ -1338,6 +1451,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
               class="${itemClassName}"
                 data-ticket-item-index="${escapeHtml(String(rowIndex))}"
                 data-ticket-item-start="${escapeHtml(String(rowReceivedAt))}"
+                data-ticket-item-stop="${Number.isFinite(rowStoppedAt) ? escapeHtml(String(rowStoppedAt)) : ""}"
               >
                 <div class="ticket-card__main ticket-card__main--category">
                   <div class="ticket-card__name">
@@ -1346,7 +1460,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
                   <div class="ticket-card__qty">${escapeHtml(String(item.quantity))}</div>
                   ${buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex)}
                   <div class="ticket-card__time" data-ticket-time>
-                    ${escapeHtml(formatElapsedTime(Date.now() - rowReceivedAt))}
+                    ${escapeHtml(getOrderItemElapsedTime(item, rowReceivedAt))}
                   </div>
                 </div>
                 ${
@@ -1377,19 +1491,23 @@ function buildTicketOverviewCardMarkup(ticketData) {
       </div>
       <div class="ticket-card__list ticket-card__list--overview">
         ${ticketData.items
-          .map(
-            (item, index) => `
-              <div class="order-item ticket-card__item ticket-card__item--overview" data-ticket-table="${escapeHtml(String(ticketData.tableNumber))}" data-ticket-item-index="${escapeHtml(String(index))}">
+          .map((item, index) => {
+            const rowIndex = Number.isInteger(item.orderIndex) ? item.orderIndex : index;
+            const itemClassName =
+              item.acceptance === "out"
+                ? "ticket-card__item--out"
+                : item.acceptance === "delivered"
+                  ? "ticket-card__item--delivered"
+                  : item.acceptance === "rejected"
+                    ? "ticket-card__item--rejected"
+                    : "ticket-card__item--pending";
+
+            return `
+              <div class="order-item ticket-card__item ticket-card__item--overview ${itemClassName}" data-ticket-table="${escapeHtml(String(ticketData.tableNumber))}" data-ticket-item-index="${escapeHtml(String(rowIndex))}">
                 <div class="order-item__main ticket-card__main--overview">
                   <div class="order-item__name">${escapeHtml(`${index + 1}. ${item.dishName}`)}</div>
                   <div class="order-item__qty">${escapeHtml(String(item.quantity))}</div>
-                  <button
-                    class="order-item__edit"
-                    type="button"
-                    data-ticket-overview-edit="${escapeHtml(String(index))}"
-                    data-ticket-table="${escapeHtml(String(ticketData.tableNumber))}"
-                    aria-label="Edit ${escapeHtml(item.dishName)}"
-                  >${buildEditIconMarkup()}</button>
+                  ${buildTicketOverviewActionMarkup(item, ticketData.tableNumber, rowIndex)}
                 </div>
                 ${
                   item.note
@@ -1398,11 +1516,51 @@ function buildTicketOverviewCardMarkup(ticketData) {
                       </div>`
                     : ""
                 }
-              </div>`,
-          )
+              </div>`;
+          })
           .join("")}
       </div>
     </article>`;
+}
+
+function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex) {
+  if (item.acceptance === "out") {
+    return `
+      <button
+        class="ticket-card__status ticket-card__status--out"
+        type="button"
+        data-ticket-deliver="${escapeHtml(String(rowIndex))}"
+        data-ticket-table="${escapeHtml(String(tableNumber))}"
+        aria-label="Mark ${escapeHtml(item.dishName)} as delivered"
+      >Out</button>`;
+  }
+
+  if (item.acceptance === "delivered") {
+    return `
+      <div class="ticket-card__status ticket-card__status--delivered" aria-hidden="true">
+        DLV
+      </div>`;
+  }
+
+  if (item.acceptance === "rejected") {
+    return `
+      <button
+        class="ticket-card__status ticket-card__status--rejected"
+        type="button"
+        data-ticket-reset="${escapeHtml(String(rowIndex))}"
+        data-ticket-table="${escapeHtml(String(tableNumber))}"
+        aria-label="Reset ${escapeHtml(item.dishName)}"
+      >${buildRefreshIconMarkup()}</button>`;
+  }
+
+  return `
+    <button
+      class="order-item__edit"
+      type="button"
+      data-ticket-overview-edit="${escapeHtml(String(rowIndex))}"
+      data-ticket-table="${escapeHtml(String(tableNumber))}"
+      aria-label="Edit ${escapeHtml(item.dishName)}"
+    >${buildEditIconMarkup()}</button>`;
 }
 
 function buildTicketsActionPopupActionsMarkup(mode) {
@@ -1540,8 +1698,31 @@ function setTicketAcceptance(tableNumber, index, acceptance) {
   const orderItems = getTicketOrderItems(tableNumber);
   if (!orderItems || !orderItems[index]) return;
 
-  orderItems[index].acceptance = acceptance;
+  const now = Date.now();
+  const orderItem = orderItems[index];
+  orderItem.acceptance = acceptance;
+
+  if (acceptance === "out") {
+    orderItem.outAt = Number.isFinite(orderItem.outAt) ? orderItem.outAt : now;
+    orderItem.rejectedAt = null;
+    orderItem.deliveredAt = null;
+  } else if (acceptance === "rejected") {
+    orderItem.rejectedAt = now;
+    orderItem.outAt = null;
+    orderItem.deliveredAt = null;
+  } else if (acceptance === "delivered") {
+    orderItem.deliveredAt = now;
+    orderItem.outAt = Number.isFinite(orderItem.outAt) ? orderItem.outAt : now;
+    orderItem.rejectedAt = null;
+  } else {
+    orderItem.outAt = null;
+    orderItem.rejectedAt = null;
+    orderItem.deliveredAt = null;
+  }
+
   state.tableOrders.set(tableNumber, orderItems);
+  const snapshot = cloneOrderItems(orderItems);
+  enqueueDatabaseWrite(() => persistOrderToDatabase(tableNumber, snapshot));
 }
 
 function clearTicketsActionState() {
@@ -1583,13 +1764,6 @@ function confirmTicketsDelivery() {
 
   setTicketAcceptance(tableNumber, state.ticketsActionIndex, "delivered");
   clearTicketsActionState();
-
-  const activeTickets = getActiveTicketData();
-  if (!activeTickets.length) {
-    goToChefTableOverview();
-    return;
-  }
-
   renderTickets();
 }
 
@@ -1743,6 +1917,10 @@ function renderMenu() {
     elements.orderFooter.style.display = state.order.length > 0 ? "flex" : "none";
   }
 
+  if (elements.orderNew) {
+    elements.orderNew.hidden = state.order.length === 0;
+  }
+
   if (elements.orderShare) {
     elements.orderShare.disabled = orderIsShared;
     elements.orderShare.textContent = orderIsShared ? "Shared" : "Share";
@@ -1807,7 +1985,7 @@ function buildBillRowsMarkup() {
   return state.order
     .map((item, index) => {
       const receivedAt = Number.isFinite(item.receivedAt) ? item.receivedAt : Date.now();
-      const elapsedTime = formatElapsedTime(Date.now() - receivedAt);
+      const elapsedTime = getOrderItemElapsedTime(item, receivedAt);
       const isEditing = index === state.editingOrderIndex;
       const acceptanceState = item.acceptance === "out"
         ? "out"
@@ -1965,6 +2143,7 @@ function confirmBillDeliveryPopup() {
   const activeOrderItem = state.order[activeIndex];
   if (activeOrderItem?.acceptance === "out") {
     activeOrderItem.acceptance = "delivered";
+    activeOrderItem.deliveredAt = Date.now();
     persistCurrentOrder();
     state.billDeliveryPromptIndex = null;
     state.billDeliveryPopupPosition = null;
@@ -2031,7 +2210,18 @@ function updateBillTimers() {
     const itemIndex = Number(billItem.dataset.billIndex);
     const orderItem = state.order[itemIndex];
     const receivedAt = Number.isFinite(orderItem?.receivedAt) ? orderItem.receivedAt : now;
-    timeElement.textContent = formatElapsedTime(now - receivedAt);
+    const stoppedAt = getOrderItemTimerStopAt(orderItem);
+    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
+  });
+}
+
+function renderCaptain() {
+  if (!elements.captainTableGrid) return;
+
+  elements.captainTableGrid.querySelectorAll(".table-tile").forEach((button) => {
+    const tableNumber = Number(button.textContent.trim());
+    if (!Number.isFinite(tableNumber)) return;
+    applyTableVisualState(button, getTableVisualState(tableNumber), tableNumber);
   });
 }
 
@@ -2070,12 +2260,8 @@ function renderSousChef() {
 
   elements.sousChefTableGrid.querySelectorAll(".table-tile").forEach((button) => {
     const tableNumber = Number(button.textContent.trim());
-    const hasOrder = Boolean(getTicketDataForOrder(tableNumber, state.tableOrders.get(tableNumber) || []));
-    button.classList.toggle("table-tile--live", hasOrder);
-    button.setAttribute(
-      "aria-label",
-      hasOrder ? `Table ${tableNumber}, new order` : `Table ${tableNumber}`,
-    );
+    if (!Number.isFinite(tableNumber)) return;
+    applyTableVisualState(button, getTableVisualState(tableNumber, { publishedOnly: true }), tableNumber);
   });
 
   const liveCategoryNames = getLiveCategoryNames(getActiveTicketData());
@@ -2248,9 +2434,10 @@ function updateTicketTimers() {
   elements.ticketsList.querySelectorAll("[data-ticket-time]").forEach((timeElement) => {
     const ticketRow = timeElement.closest("[data-ticket-item-start]");
     const receivedAt = Number(ticketRow?.dataset.ticketItemStart);
+    const stoppedAt = Number(ticketRow?.dataset.ticketItemStop);
     if (!Number.isFinite(receivedAt)) return;
 
-    timeElement.textContent = formatElapsedTime(now - receivedAt);
+    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
   });
 }
 
@@ -2332,6 +2519,8 @@ function syncRoute() {
     renderTickets();
   } else if (route.page === "sous-chef") {
     renderSousChef();
+  } else if (route.page === "captain") {
+    renderCaptain();
   }
 }
 
@@ -2399,6 +2588,10 @@ if (elements.orderShare) {
   elements.orderShare.addEventListener("click", shareOrder);
 }
 
+if (elements.orderNew) {
+  elements.orderNew.addEventListener("click", startNewOrder);
+}
+
 if (elements.ticketsLiveCategories) {
   elements.ticketsLiveCategories.addEventListener("click", (event) => {
     const categoryButton = event.target.closest("[data-ticket-category-select]");
@@ -2448,6 +2641,17 @@ if (elements.sousChefLiveCategories) {
 
 if (elements.ticketsList) {
   elements.ticketsList.addEventListener("click", (event) => {
+    const overviewEditButton = event.target.closest("[data-ticket-overview-edit]");
+    if (overviewEditButton) {
+      openTicketsActionPopup(
+        Number(overviewEditButton.dataset.ticketTable),
+        Number(overviewEditButton.dataset.ticketOverviewEdit),
+        "acceptance",
+        overviewEditButton,
+      );
+      return;
+    }
+
     const overviewCard = event.target.closest(".ticket-card--overview");
     if (
       overviewCard &&
@@ -2536,6 +2740,9 @@ if (elements.billList) {
       const orderIndex = Number(resetButton.dataset.billReset);
       if (state.order[orderIndex]) {
         delete state.order[orderIndex].acceptance;
+        state.order[orderIndex].outAt = null;
+        state.order[orderIndex].rejectedAt = null;
+        state.order[orderIndex].deliveredAt = null;
         if (state.billDeliveryPromptIndex === orderIndex) {
           state.billDeliveryPromptIndex = null;
         }
@@ -2559,6 +2766,11 @@ if (elements.billList) {
       const orderIndex = Number(acceptButton.dataset.billAccept);
       if (state.order[orderIndex]) {
         state.order[orderIndex].acceptance = "out";
+        state.order[orderIndex].outAt = Number.isFinite(state.order[orderIndex].outAt)
+          ? state.order[orderIndex].outAt
+          : Date.now();
+        state.order[orderIndex].rejectedAt = null;
+        state.order[orderIndex].deliveredAt = null;
         state.billDeliveryPromptIndex = null;
         persistCurrentOrder();
         renderBill();
@@ -2572,6 +2784,9 @@ if (elements.billList) {
     const orderIndex = Number(rejectButton.dataset.billReject);
     if (state.order[orderIndex]) {
       state.order[orderIndex].acceptance = "rejected";
+      state.order[orderIndex].rejectedAt = Date.now();
+      state.order[orderIndex].outAt = null;
+      state.order[orderIndex].deliveredAt = null;
       if (state.billDeliveryPromptIndex === orderIndex) {
         state.billDeliveryPromptIndex = null;
       }
@@ -2662,10 +2877,16 @@ window.addEventListener("resize", () => {
     Number.isInteger(state.ticketsActionIndex) &&
     elements.ticketsList
   ) {
-    const selector = state.ticketsActionMode === "delivery"
-      ? `[data-ticket-deliver="${state.ticketsActionIndex}"][data-ticket-table="${state.ticketsActionTableNumber}"]`
-      : `[data-ticket-accept="${state.ticketsActionIndex}"][data-ticket-table="${state.ticketsActionTableNumber}"]`;
-    const anchorElement = elements.ticketsList.querySelector(selector);
+    const anchorElement = state.ticketsActionMode === "delivery"
+      ? elements.ticketsList.querySelector(
+          `[data-ticket-deliver="${state.ticketsActionIndex}"][data-ticket-table="${state.ticketsActionTableNumber}"]`,
+        )
+      : elements.ticketsList.querySelector(
+          `[data-ticket-overview-edit="${state.ticketsActionIndex}"][data-ticket-table="${state.ticketsActionTableNumber}"]`,
+        ) ||
+        elements.ticketsList.querySelector(
+          `[data-ticket-accept="${state.ticketsActionIndex}"][data-ticket-table="${state.ticketsActionTableNumber}"]`,
+        );
     state.ticketsActionPopupPosition = computeTicketsActionPopupPosition(
       anchorElement,
       state.ticketsActionMode,
