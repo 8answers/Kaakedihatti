@@ -2628,7 +2628,7 @@ body.modal-open {
 }
 
 .payment-close-modal--payment-selected .payment-close-modal__upload {
-  background: rgba(0, 132, 255, 0.5);
+  background: #0084ff;
   cursor: pointer;
 }
 
