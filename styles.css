@@ -121,6 +121,14 @@ body.modal-open {
   position: relative;
 }
 
+.content--captain-bill,
+.content--captain-delivery {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 16px 0 0;
+  position: relative;
+}
+
 .content--sous-chef {
   align-items: stretch;
   justify-content: stretch;
@@ -170,6 +178,8 @@ body.modal-open {
 .dish-modal__add:focus-visible,
 .dish-modal__note:focus-visible,
 .order-item__edit:focus-visible,
+.order-delivered:focus-visible,
+.order-bill:focus-visible,
 .order-share:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
@@ -1179,8 +1189,8 @@ body.modal-open {
   min-width: 74px;
   height: 32px;
   border: 0;
-  background: #fff;
-  color: #000;
+  background: #ff1212;
+  color: #fff;
   font: 700 16px/1 "Kulim Park", sans-serif;
   padding: 0 16px;
   cursor: pointer;
@@ -1531,6 +1541,8 @@ body.modal-open {
 .order-footer {
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
+  gap: 32px;
   justify-content: stretch;
   position: fixed;
   right: 24px;
@@ -1541,12 +1553,19 @@ body.modal-open {
   z-index: 20;
 }
 
+.order-footer__actions {
+  display: flex;
+  align-items: stretch;
+  gap: 32px;
+  width: 100%;
+}
+
+.order-delivered,
+.order-bill,
 .order-share {
   width: 100%;
   height: 40px;
   border: 0;
-  background: #0084ff;
-  color: #fff;
   font: 700 32px/1 "Kulim Park", sans-serif;
   padding: 8px 24px;
   cursor: pointer;
@@ -1554,6 +1573,34 @@ body.modal-open {
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.order-delivered {
+  background: #fff;
+  color: #000;
+}
+
+.order-bill,
+.order-share {
+  flex: 1 1 0;
+  min-width: 0;
+  color: #fff;
+}
+
+.order-bill {
+  gap: 16px;
+  background: #d98713;
+}
+
+.order-bill__icon {
+  width: 22px;
+  height: 24px;
+  display: block;
+  object-fit: contain;
+}
+
+.order-share {
+  background: #0084ff;
 }
 
 .order-share:disabled,
@@ -2001,6 +2048,397 @@ body.modal-open {
   stroke-linejoin: round;
 }
 
+.captain-bill,
+.captain-delivery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.captain-bill[hidden],
+.captain-delivery[hidden] {
+  display: none !important;
+}
+
+.captain-bill__header,
+.captain-delivery__header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #191919;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.captain-bill__empty,
+.captain-delivery__empty {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.captain-bill__columns,
+.captain-bill__item-main,
+.captain-bill__total {
+  display: grid;
+  grid-template-columns: minmax(0, 268px) 50px 145px 50px 145px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.captain-bill__columns {
+  margin-top: 16px;
+}
+
+.captain-bill__column,
+.captain-bill__item-name,
+.captain-bill__item-qty,
+.captain-bill__item-unit,
+.captain-bill__item-edit,
+.captain-bill__item-total,
+.captain-bill__total > div {
+  min-width: 0;
+}
+
+.captain-bill__column--qty,
+.captain-bill__column--edit,
+.captain-bill__item-qty,
+.captain-bill__item-edit,
+.captain-bill__total-qty,
+.captain-bill__total-edit {
+  text-align: center;
+  justify-content: center;
+}
+
+.captain-bill__column--unit,
+.captain-bill__item-unit {
+  text-align: right;
+}
+
+.captain-bill__column--total,
+.captain-bill__item-total,
+.captain-bill__total-amount {
+  text-align: right;
+}
+
+.captain-bill__list-wrap {
+  flex: 0 1 auto;
+  max-height: calc(100vh - 280px);
+  min-height: 0;
+  overflow: auto;
+}
+
+.captain-delivery__list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.captain-bill__list,
+.captain-delivery__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.captain-bill__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.captain-bill__item,
+.captain-delivery__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.captain-bill__item-name,
+.captain-delivery__item-name {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.captain-bill__item-index,
+.captain-delivery__item-index {
+  flex: 0 0 auto;
+  margin-right: 4px;
+}
+
+.captain-bill__item-dish,
+.captain-delivery__item-dish {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.captain-bill__item-edit {
+  width: 50px;
+  height: 27px;
+  border: 0;
+  background: transparent;
+  color: #0084ff;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.captain-bill__item-edit svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.captain-bill__item-note-row,
+.captain-delivery__item-note-row {
+  padding: 0 24px 0 62px;
+}
+
+.captain-bill__item-note,
+.captain-delivery__item-note {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.captain-bill__item--editing {
+  background: #fff;
+}
+
+.captain-bill__item--editing .captain-bill__item-main,
+.captain-bill__item--editing .captain-bill__item-note-row {
+  background: #fff;
+}
+
+.captain-bill__item--editing .captain-bill__item-name,
+.captain-bill__item--editing .captain-bill__item-qty,
+.captain-bill__item--editing .captain-bill__item-unit,
+.captain-bill__item--editing .captain-bill__item-edit,
+.captain-bill__item--editing .captain-bill__item-total {
+  color: #000;
+}
+
+.captain-bill__item--editing .captain-bill__item-note {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.captain-bill__divider {
+  height: 1px;
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.captain-bill__total {
+  min-height: 40px;
+  margin-top: 16px;
+}
+
+.captain-bill__footer {
+  flex: 0 0 auto;
+  position: fixed;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+}
+
+.captain-bill__print {
+  width: 100%;
+  height: 40px;
+  border: 0;
+  background: #0084ff;
+  color: #fff;
+  font: 700 32px/1 "Kulim Park", sans-serif;
+  padding: 8px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.captain-bill__print svg {
+  width: 25px;
+  height: 24px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.captain-delivery__columns,
+.captain-delivery__item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 268px) 50px 274px 107px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.captain-delivery__columns {
+  margin-top: 16px;
+}
+
+.captain-delivery__column--qty,
+.captain-delivery__item-qty,
+.captain-delivery__column--delivered,
+.captain-delivery__item-action {
+  text-align: center;
+}
+
+.captain-delivery__column--time,
+.captain-delivery__item-time {
+  text-align: right;
+}
+
+.captain-delivery__list {
+  display: flex;
+  flex-direction: column;
+  gap: 41px;
+  padding-top: 16px;
+}
+
+.captain-delivery__item--out {
+  background: rgba(199, 174, 12, 0.32);
+}
+
+.captain-delivery__item--ready,
+.captain-delivery__item--confirmed {
+  background: #2e2e2e;
+}
+
+.captain-delivery__item--prompting {
+  background: #7a7a7a;
+}
+
+.captain-delivery__check {
+  width: 121px;
+  height: 27px;
+  border: 0;
+  padding: 0;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+}
+
+.captain-delivery__check--muted {
+  background: rgba(0, 158, 18, 0.18);
+  color: rgba(255, 255, 255, 0.22);
+  cursor: default;
+}
+
+.captain-delivery__check--ready {
+  background: #009e12;
+  color: #fff;
+  cursor: pointer;
+}
+
+.captain-delivery__delivered-label {
+  width: 121px;
+  height: 27px;
+  background: #0084ff;
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+}
+
+.captain-delivery-popup {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 45;
+}
+
+.captain-delivery-popup[hidden] {
+  display: none !important;
+}
+
+.captain-delivery-popup__card {
+  width: min(274px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  background: #fff;
+  color: #000;
+}
+
+.captain-delivery-popup__header {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.captain-delivery-popup__title {
+  color: #000;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.captain-delivery-popup__close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  color: #000;
+  padding: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.captain-delivery-popup__yes {
+  width: 100%;
+  height: 27px;
+  border: 0;
+  background: #009e12;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 400 16px/1 "Kulim Park", sans-serif;
+}
+
 .dish-modal {
   position: fixed;
   inset: 0;
@@ -2428,6 +2866,11 @@ body.modal-open {
     padding: 0;
   }
 
+  .content--captain-bill,
+  .content--captain-delivery {
+    padding: 16px 0 0;
+  }
+
   .role-stack {
     gap: 20px;
     width: calc(100vw - 32px);
@@ -2740,11 +3183,82 @@ body.modal-open {
     right: 24px;
     bottom: 24px;
     width: calc(100vw - 48px);
+    gap: 24px;
   }
 
+  .order-footer__actions {
+    gap: 24px;
+  }
+
+  .order-delivered,
+  .order-bill,
   .order-share {
     height: 36px;
     font-size: 24px;
+  }
+
+  .order-bill__icon {
+    width: 18px;
+    height: 20px;
+  }
+
+  .captain-bill__header,
+  .captain-delivery__header,
+  .captain-bill__empty,
+  .captain-delivery__empty,
+  .captain-bill__columns,
+  .captain-bill__item-main,
+  .captain-bill__total,
+  .captain-bill__item-note,
+  .captain-delivery__columns,
+  .captain-delivery__item-main,
+  .captain-delivery__item-note {
+    font-size: 18px;
+  }
+
+  .captain-bill__columns,
+  .captain-bill__item-main,
+  .captain-bill__total {
+    grid-template-columns: minmax(0, 1fr) 36px 90px 36px 90px;
+    gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .captain-delivery__columns,
+  .captain-delivery__item-main {
+    grid-template-columns: minmax(0, 1fr) 36px 120px 80px;
+    gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .captain-bill__item-edit {
+    width: 36px;
+    height: 24px;
+  }
+
+  .captain-bill__item-edit svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .captain-bill__item-note-row,
+  .captain-delivery__item-note-row {
+    padding-left: 48px;
+    padding-right: 16px;
+  }
+
+  .captain-bill__print {
+    height: 36px;
+    font-size: 24px;
+  }
+
+  .captain-delivery__check,
+  .captain-delivery__delivered-label {
+    width: 80px;
+    height: 24px;
+    font-size: 18px;
   }
 
   .dish-modal {

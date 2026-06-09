@@ -324,6 +324,106 @@
         </main>
       </section>
 
+      <section class="screen screen--captain-bill" data-page="captain-bill" hidden>
+        <header class="topbar topbar--menu" aria-label="Table Order (Bill)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="menu"
+            aria-label="Back to captain order"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title" data-captain-bill-title>Table 5 Order (Bill)</span>
+        </header>
+
+        <main class="content content--captain-bill" aria-label="Captain bill view">
+          <section class="captain-bill" data-captain-bill-empty hidden aria-label="Order">
+            <div class="captain-bill__header">Current Order</div>
+            <div class="captain-bill__empty">NA</div>
+          </section>
+
+          <section class="captain-bill" data-captain-bill-filled hidden aria-label="Current order bill">
+            <div class="captain-bill__header">Current Order</div>
+            <div class="captain-bill__columns" aria-hidden="true">
+              <div class="captain-bill__column captain-bill__column--items">Items</div>
+              <div class="captain-bill__column captain-bill__column--qty">Qty</div>
+              <div class="captain-bill__column captain-bill__column--unit">Unit Prize (₹)</div>
+              <div class="captain-bill__column captain-bill__column--edit">Edit</div>
+              <div class="captain-bill__column captain-bill__column--total">Total Cost (₹)</div>
+            </div>
+            <div class="captain-bill__list-wrap">
+              <ul class="captain-bill__list" data-captain-bill-list></ul>
+            </div>
+            <div class="captain-bill__divider" aria-hidden="true"></div>
+            <div class="captain-bill__total" data-captain-bill-total></div>
+            <div class="captain-bill__footer">
+              <button class="captain-bill__print" type="button" data-captain-bill-print>
+                <span>Print</span>
+                <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
+                  <path d="M7 8V3h10v5"></path>
+                  <path d="M7 17H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"></path>
+                  <path d="M7 14h10v7H7z"></path>
+                </svg>
+              </button>
+            </div>
+          </section>
+        </main>
+      </section>
+
+      <section class="screen screen--captain-delivery" data-page="captain-delivery" hidden>
+        <header class="topbar topbar--menu" aria-label="Table Order (Delivery to the Table)">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="menu"
+            aria-label="Back to captain order"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title" data-captain-delivery-title>Table 5 Order (Delivery to the Table)</span>
+        </header>
+
+        <main class="content content--captain-delivery" aria-label="Captain delivery view">
+          <section class="captain-delivery" data-captain-delivery-empty hidden aria-label="Order delivery">
+            <div class="captain-delivery__header">Current Order</div>
+            <div class="captain-delivery__empty">NA</div>
+          </section>
+
+          <section class="captain-delivery" data-captain-delivery-filled hidden aria-label="Current order delivery">
+            <div class="captain-delivery__header">Current Order</div>
+            <div class="captain-delivery__columns" aria-hidden="true">
+              <div class="captain-delivery__column captain-delivery__column--items">Items</div>
+              <div class="captain-delivery__column captain-delivery__column--qty">Qty</div>
+              <div class="captain-delivery__column captain-delivery__column--delivered">Delivered?</div>
+              <div class="captain-delivery__column captain-delivery__column--time">Time</div>
+            </div>
+            <div class="captain-delivery__list-wrap">
+              <ul class="captain-delivery__list" data-captain-delivery-list></ul>
+            </div>
+          </section>
+
+          <div class="captain-delivery-popup" data-captain-delivery-popup hidden aria-hidden="true">
+            <div class="captain-delivery-popup__card" role="dialog" aria-modal="true" aria-labelledby="captain-delivery-popup-title">
+              <div class="captain-delivery-popup__header">
+                <div class="captain-delivery-popup__title" id="captain-delivery-popup-title">Delivered?</div>
+                <button
+                  class="captain-delivery-popup__close"
+                  type="button"
+                  data-captain-delivery-popup-close
+                  aria-label="Close delivery popup"
+                >
+                  ×
+                </button>
+              </div>
+              <button class="captain-delivery-popup__yes" type="button" data-captain-delivery-popup-yes>
+                Yes
+              </button>
+            </div>
+          </div>
+        </main>
+      </section>
+
       <section class="screen screen--menu" data-page="menu" hidden>
         <header class="topbar topbar--menu" aria-label="Table Order">
           <button
@@ -372,7 +472,7 @@
                   data-order-new
                   hidden
                 >
-                  New
+                  Close
                 </button>
               </div>
               <div class="menu-panel__body menu-panel__body--order">
@@ -382,9 +482,18 @@
                   <ul class="order-list" data-order-list hidden></ul>
                 </div>
                 <div class="order-footer" data-order-footer hidden>
-                  <button class="order-share" type="button" data-order-share>
-                    Share
+                  <button class="order-delivered" type="button" data-order-delivered>
+                    Delivered?
                   </button>
+                  <div class="order-footer__actions">
+                    <button class="order-bill" type="button" data-order-bill>
+                      <span>Bill</span>
+                      <img class="order-bill__icon" src="./Bill.png" alt="" aria-hidden="true" />
+                    </button>
+                    <button class="order-share" type="button" data-order-share>
+                      Share
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>

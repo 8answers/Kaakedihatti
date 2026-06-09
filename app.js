@@ -397,11 +397,26 @@ const elements = {
   billDeliveryPopup: document.querySelector("[data-bill-delivery-popup]"),
   billDeliveryClose: document.querySelector("[data-bill-delivery-close]"),
   billDeliveryYes: document.querySelector("[data-bill-delivery-yes]"),
+  captainBillTitle: document.querySelector("[data-captain-bill-title]"),
+  captainBillEmpty: document.querySelector("[data-captain-bill-empty]"),
+  captainBillFilled: document.querySelector("[data-captain-bill-filled]"),
+  captainBillList: document.querySelector("[data-captain-bill-list]"),
+  captainBillTotal: document.querySelector("[data-captain-bill-total]"),
+  captainBillPrint: document.querySelector("[data-captain-bill-print]"),
+  captainDeliveryTitle: document.querySelector("[data-captain-delivery-title]"),
+  captainDeliveryEmpty: document.querySelector("[data-captain-delivery-empty]"),
+  captainDeliveryFilled: document.querySelector("[data-captain-delivery-filled]"),
+  captainDeliveryList: document.querySelector("[data-captain-delivery-list]"),
+  captainDeliveryPopup: document.querySelector("[data-captain-delivery-popup]"),
+  captainDeliveryPopupClose: document.querySelector("[data-captain-delivery-popup-close]"),
+  captainDeliveryPopupYes: document.querySelector("[data-captain-delivery-popup-yes]"),
   orderColumns: document.querySelector("[data-order-columns]"),
   orderEmpty: document.querySelector("[data-order-empty]"),
   orderList: document.querySelector("[data-order-list]"),
   orderFooter: document.querySelector("[data-order-footer]"),
   orderShare: document.querySelector("[data-order-share]"),
+  orderBill: document.querySelector("[data-order-bill]"),
+  orderDelivered: document.querySelector("[data-order-delivered]"),
   orderNew: document.querySelector("[data-order-new]"),
   dishModal: document.querySelector("[data-dish-modal]"),
   dishModalTitle: document.querySelector("[data-dish-modal-title]"),
@@ -432,6 +447,8 @@ const state = {
   ticketsActionIndex: null,
   ticketsActionMode: null,
   ticketsActionPopupPosition: null,
+  captainDeliveryPromptIndex: null,
+  captainDeliveryPopupPosition: null,
   billDeliveryPromptIndex: null,
   billDeliveryPopupPosition: null,
   editingOrderIndex: null,
@@ -489,6 +506,22 @@ function parseRoute() {
     };
   }
 
+  if (hash.startsWith("captain-bill-")) {
+    const tableNumber = Number(hash.slice(13));
+    return {
+      page: "captain-bill",
+      tableNumber: Number.isFinite(tableNumber) && tableNumber > 0 ? tableNumber : 1,
+    };
+  }
+
+  if (hash.startsWith("captain-delivery-")) {
+    const tableNumber = Number(hash.slice(17));
+    return {
+      page: "captain-delivery",
+      tableNumber: Number.isFinite(tableNumber) && tableNumber > 0 ? tableNumber : 1,
+    };
+  }
+
   return { page: "home" };
 }
 
@@ -520,6 +553,16 @@ function setRoute(page, tableNumber = 1) {
 
   if (page === "bill") {
     location.hash = `#bill-${tableNumber}`;
+    return;
+  }
+
+  if (page === "captain-bill") {
+    location.hash = `#captain-bill-${tableNumber}`;
+    return;
+  }
+
+  if (page === "captain-delivery") {
+    location.hash = `#captain-delivery-${tableNumber}`;
     return;
   }
 
@@ -917,7 +960,7 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
 }
 
 function isOrderRoute(pageName) {
-  return pageName === "menu" || pageName === "bill";
+  return pageName === "menu" || pageName === "bill" || pageName === "captain-bill" || pageName === "captain-delivery";
 }
 
 function persistCurrentOrder() {
@@ -1102,7 +1145,7 @@ function syncDishPopupBounds(shouldMeasure) {
     return;
   }
 
-  if (state.page === "bill") {
+  if (state.page === "bill" || state.page === "captain-bill") {
     elements.dishModal.style.setProperty("--dish-modal-edit-right", "0px");
     return;
   }
@@ -1971,6 +2014,24 @@ function getDishUnitPrice(categoryName) {
   return priceMap[categoryName] ?? 180;
 }
 
+function getOrderItemUnitPrice(item) {
+  return getDishUnitPrice(item?.categoryName);
+}
+
+function getOrderItemTotalPrice(item) {
+  return getOrderItemUnitPrice(item) * (Number(item?.quantity) || 1);
+}
+
+function formatMoneyAmount(amount, { currency = false } = {}) {
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const hasFraction = Math.round(safeAmount * 100) % 100 !== 0;
+  const formatted = safeAmount.toLocaleString("en-IN", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+  return currency ? `₹ ${formatted}` : formatted;
+}
+
 function formatElapsedTime(milliseconds) {
   const safeMilliseconds = Math.max(0, Math.floor(milliseconds));
   const totalSeconds = Math.floor(safeMilliseconds / 1000);
@@ -2215,6 +2276,288 @@ function updateBillTimers() {
   });
 }
 
+function buildCaptainBillRowsMarkup() {
+  return state.order
+    .map((item, index) => {
+      const unitPrice = getOrderItemUnitPrice(item);
+      const totalPrice = getOrderItemTotalPrice(item);
+      const isEditing = index === state.editingOrderIndex;
+
+      return `
+        <li class="captain-bill__item${isEditing ? " captain-bill__item--editing" : ""}" data-captain-bill-index="${index}">
+          <div class="captain-bill__item-main">
+            <div class="captain-bill__item-name">
+              <span class="captain-bill__item-index">${escapeHtml(`${index + 1}.`)}</span>
+              <span class="captain-bill__item-dish">${escapeHtml(item.dishName)}</span>
+            </div>
+            <div class="captain-bill__item-qty">${escapeHtml(String(item.quantity))}</div>
+            <div class="captain-bill__item-unit">${escapeHtml(formatMoneyAmount(unitPrice))}</div>
+            <button
+              class="captain-bill__item-edit"
+              type="button"
+              data-captain-bill-edit="${index}"
+              aria-label="Edit ${escapeHtml(item.dishName)}"
+            >${buildEditIconMarkup()}</button>
+            <div class="captain-bill__item-total">${escapeHtml(formatMoneyAmount(totalPrice))}</div>
+          </div>
+          ${
+            item.note
+              ? `<div class="captain-bill__item-note-row">
+                  <div class="captain-bill__item-note">${escapeHtml(item.note)}</div>
+                </div>`
+              : ""
+          }
+        </li>`;
+    })
+    .join("");
+}
+
+function buildCaptainBillTotalMarkup() {
+  const totalQuantity = state.order.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+  const totalAmount = state.order.reduce((sum, item) => sum + getOrderItemTotalPrice(item), 0);
+
+  return `
+    <div class="captain-bill__total-items">Total</div>
+    <div class="captain-bill__total-qty">${escapeHtml(String(totalQuantity))}</div>
+    <div class="captain-bill__total-unit" aria-hidden="true"></div>
+    <div class="captain-bill__total-edit" aria-hidden="true"></div>
+    <div class="captain-bill__total-amount">${escapeHtml(formatMoneyAmount(totalAmount, { currency: true }))}</div>
+  `;
+}
+
+function renderCaptainBill() {
+  if (elements.captainBillTitle) {
+    elements.captainBillTitle.textContent = `Table ${state.tableNumber} Order (Bill)`;
+  }
+
+  const hasOrder = state.order.length > 0;
+
+  if (elements.captainBillEmpty) {
+    elements.captainBillEmpty.hidden = hasOrder;
+  }
+
+  if (elements.captainBillFilled) {
+    elements.captainBillFilled.hidden = !hasOrder;
+  }
+
+  if (elements.captainBillList) {
+    elements.captainBillList.innerHTML = hasOrder ? buildCaptainBillRowsMarkup() : "";
+  }
+
+  if (elements.captainBillTotal) {
+    elements.captainBillTotal.innerHTML = hasOrder ? buildCaptainBillTotalMarkup() : "";
+  }
+
+  persistCurrentOrder();
+  syncDishPopup();
+}
+
+function getCaptainDeliveryItemState(item, index) {
+  if (Number.isFinite(item?.captainDeliveredAt)) return "confirmed";
+  if (index === state.captainDeliveryPromptIndex) return "prompting";
+  if (item?.acceptance === "delivered") return "ready";
+  if (item?.acceptance === "out" || item?.acceptance === "accepted") return "out";
+  return "pending";
+}
+
+function buildCaptainDeliveryActionMarkup(item, index, deliveryState) {
+  if (deliveryState === "confirmed") {
+    return `<div class="captain-delivery__delivered-label">Delivered</div>`;
+  }
+
+  const isReady = deliveryState === "ready" || deliveryState === "prompting";
+
+  return `
+    <button
+      class="captain-delivery__check${isReady ? " captain-delivery__check--ready" : " captain-delivery__check--muted"}"
+      type="button"
+      data-captain-delivery-confirm="${index}"
+      aria-label="Mark ${escapeHtml(item.dishName)} delivered"
+      ${isReady ? "" : "disabled"}
+    >✓</button>`;
+}
+
+function buildCaptainDeliveryRowsMarkup() {
+  return state.order
+    .map((item, index) => {
+      const receivedAt = Number.isFinite(item.receivedAt) ? item.receivedAt : Date.now();
+      const stoppedAt = getOrderItemTimerStopAt(item);
+      const elapsedTime = getOrderItemElapsedTime(item, receivedAt);
+      const deliveryState = getCaptainDeliveryItemState(item, index);
+      const itemClassName = [
+        "captain-delivery__item",
+        `captain-delivery__item--${deliveryState}`,
+      ].join(" ");
+
+      return `
+        <li
+          class="${itemClassName}"
+          data-captain-delivery-index="${index}"
+          data-captain-delivery-start="${escapeHtml(String(receivedAt))}"
+          data-captain-delivery-stop="${Number.isFinite(stoppedAt) ? escapeHtml(String(stoppedAt)) : ""}"
+        >
+          <div class="captain-delivery__item-main">
+            <div class="captain-delivery__item-name">
+              <span class="captain-delivery__item-index">${escapeHtml(`${index + 1}.`)}</span>
+              <span class="captain-delivery__item-dish">${escapeHtml(item.dishName)}</span>
+            </div>
+            <div class="captain-delivery__item-qty">${escapeHtml(String(item.quantity))}</div>
+            <div class="captain-delivery__item-action">
+              ${buildCaptainDeliveryActionMarkup(item, index, deliveryState)}
+            </div>
+            <div class="captain-delivery__item-time" data-captain-delivery-time>${escapeHtml(elapsedTime)}</div>
+          </div>
+          ${
+            item.note
+              ? `<div class="captain-delivery__item-note-row">
+                  <div class="captain-delivery__item-note">${escapeHtml(item.note)}</div>
+                </div>`
+              : ""
+          }
+        </li>`;
+    })
+    .join("");
+}
+
+function renderCaptainDelivery() {
+  if (elements.captainDeliveryTitle) {
+    elements.captainDeliveryTitle.textContent = `Table ${state.tableNumber} Order (Delivery to the Table)`;
+  }
+
+  const hasOrder = state.order.length > 0;
+
+  if (elements.captainDeliveryEmpty) {
+    elements.captainDeliveryEmpty.hidden = hasOrder;
+  }
+
+  if (elements.captainDeliveryFilled) {
+    elements.captainDeliveryFilled.hidden = !hasOrder;
+  }
+
+  if (elements.captainDeliveryList) {
+    elements.captainDeliveryList.innerHTML = hasOrder ? buildCaptainDeliveryRowsMarkup() : "";
+  }
+
+  persistCurrentOrder();
+  syncDishPopup();
+  syncCaptainDeliveryPopup();
+  updateCaptainDeliveryTimers();
+}
+
+function updateCaptainDeliveryTimers() {
+  if (!elements.captainDeliveryList) return;
+
+  const now = Date.now();
+
+  elements.captainDeliveryList.querySelectorAll("[data-captain-delivery-time]").forEach((timeElement) => {
+    const rowElement = timeElement.closest("[data-captain-delivery-index]");
+    const itemIndex = Number(rowElement?.dataset.captainDeliveryIndex);
+    const orderItem = state.order[itemIndex];
+    const receivedAt = Number.isFinite(orderItem?.receivedAt) ? orderItem.receivedAt : now;
+    const stoppedAt = getOrderItemTimerStopAt(orderItem);
+    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
+  });
+}
+
+function computeCaptainDeliveryPopupPosition(anchorElement) {
+  if (!anchorElement) return null;
+
+  const anchorRect = anchorElement.getBoundingClientRect();
+  const popupWidth = 274;
+  const popupHeight = 92;
+  const gap = 12;
+  const margin = 12;
+
+  let left = anchorRect.right + gap;
+  if (left + popupWidth > window.innerWidth - margin) {
+    left = anchorRect.left - gap - popupWidth;
+  }
+
+  left = Math.max(margin, Math.min(left, window.innerWidth - popupWidth - margin));
+
+  let top = anchorRect.top - 20;
+  top = Math.max(margin, Math.min(top, window.innerHeight - popupHeight - margin));
+
+  return {
+    left: Math.round(left),
+    top: Math.round(top),
+  };
+}
+
+function syncCaptainDeliveryPopup() {
+  if (!elements.captainDeliveryPopup) return;
+
+  const activeIndex = Number.isInteger(state.captainDeliveryPromptIndex)
+    ? state.captainDeliveryPromptIndex
+    : null;
+  const activeOrderItem = activeIndex !== null ? state.order[activeIndex] : null;
+  const shouldShowPopup =
+    state.page === "captain-delivery" &&
+    activeOrderItem?.acceptance === "delivered" &&
+    !Number.isFinite(activeOrderItem.captainDeliveredAt);
+
+  elements.captainDeliveryPopup.hidden = !shouldShowPopup;
+  elements.captainDeliveryPopup.setAttribute("aria-hidden", shouldShowPopup ? "false" : "true");
+
+  if (shouldShowPopup && state.captainDeliveryPopupPosition) {
+    elements.captainDeliveryPopup.style.left = `${state.captainDeliveryPopupPosition.left}px`;
+    elements.captainDeliveryPopup.style.top = `${state.captainDeliveryPopupPosition.top}px`;
+  } else {
+    elements.captainDeliveryPopup.style.left = "";
+    elements.captainDeliveryPopup.style.top = "";
+  }
+}
+
+function openCaptainDeliveryPopup(index, anchorElement) {
+  if (!Number.isInteger(index) || index < 0 || index >= state.order.length) return;
+
+  const orderItem = state.order[index];
+  if (orderItem.acceptance !== "delivered" || Number.isFinite(orderItem.captainDeliveredAt)) return;
+
+  state.captainDeliveryPromptIndex = index;
+  state.captainDeliveryPopupPosition = computeCaptainDeliveryPopupPosition(anchorElement);
+  renderCaptainDelivery();
+}
+
+function closeCaptainDeliveryPopup() {
+  if (state.captainDeliveryPromptIndex === null) return;
+  state.captainDeliveryPromptIndex = null;
+  state.captainDeliveryPopupPosition = null;
+  renderCaptainDelivery();
+}
+
+function confirmCaptainDeliveryPopup() {
+  const activeIndex = state.captainDeliveryPromptIndex;
+  if (!Number.isInteger(activeIndex)) {
+    closeCaptainDeliveryPopup();
+    return;
+  }
+
+  markCaptainDeliveryItem(activeIndex);
+}
+
+function markCaptainDeliveryItem(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= state.order.length) return;
+
+  const orderItem = state.order[index];
+  if (orderItem.acceptance !== "delivered") return;
+
+  orderItem.acceptance = "delivered";
+  orderItem.deliveredAt = Number.isFinite(orderItem.deliveredAt) ? orderItem.deliveredAt : Date.now();
+  orderItem.outAt = Number.isFinite(orderItem.outAt) ? orderItem.outAt : orderItem.deliveredAt;
+  orderItem.rejectedAt = null;
+  orderItem.captainDeliveredAt = Number.isFinite(orderItem.captainDeliveredAt)
+    ? orderItem.captainDeliveredAt
+    : Date.now();
+  state.captainDeliveryPromptIndex = null;
+  state.captainDeliveryPopupPosition = null;
+  persistCurrentOrder();
+  renderCaptainDelivery();
+  renderCaptain();
+  renderSousChef();
+  renderTickets();
+}
+
 function renderCaptain() {
   if (!elements.captainTableGrid) return;
 
@@ -2447,6 +2790,16 @@ function renderActiveOrderView() {
     return;
   }
 
+  if (state.page === "captain-bill") {
+    renderCaptainBill();
+    return;
+  }
+
+  if (state.page === "captain-delivery") {
+    renderCaptainDelivery();
+    return;
+  }
+
   if (state.page === "tickets") {
     renderTickets();
     return;
@@ -2487,6 +2840,8 @@ function syncRoute() {
     state.ticketsActionIndex = null;
     state.ticketsActionMode = null;
     state.ticketsActionPopupPosition = null;
+    state.captainDeliveryPromptIndex = null;
+    state.captainDeliveryPopupPosition = null;
     state.billDeliveryPromptIndex = null;
     state.billDeliveryPopupPosition = null;
     state.editingOrderIndex = null;
@@ -2500,6 +2855,8 @@ function syncRoute() {
     state.ticketsActionIndex = null;
     state.ticketsActionMode = null;
     state.ticketsActionPopupPosition = null;
+    state.captainDeliveryPromptIndex = null;
+    state.captainDeliveryPopupPosition = null;
     state.billDeliveryPromptIndex = null;
     state.billDeliveryPopupPosition = null;
     state.editingOrderIndex = null;
@@ -2515,6 +2872,10 @@ function syncRoute() {
     renderMenu();
   } else if (route.page === "bill") {
     renderBill();
+  } else if (route.page === "captain-bill") {
+    renderCaptainBill();
+  } else if (route.page === "captain-delivery") {
+    renderCaptainDelivery();
   } else if (route.page === "tickets") {
     renderTickets();
   } else if (route.page === "sous-chef") {
@@ -2588,8 +2949,60 @@ if (elements.orderShare) {
   elements.orderShare.addEventListener("click", shareOrder);
 }
 
+if (elements.orderBill) {
+  elements.orderBill.addEventListener("click", () => {
+    persistCurrentOrder();
+    setRoute("captain-bill", state.tableNumber);
+  });
+}
+
+if (elements.orderDelivered) {
+  elements.orderDelivered.addEventListener("click", () => {
+    persistCurrentOrder();
+    setRoute("captain-delivery", state.tableNumber);
+  });
+}
+
 if (elements.orderNew) {
   elements.orderNew.addEventListener("click", startNewOrder);
+}
+
+if (elements.captainBillList) {
+  elements.captainBillList.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-captain-bill-edit]");
+    if (!editButton) return;
+    editOrderItem(Number(editButton.dataset.captainBillEdit));
+  });
+}
+
+if (elements.captainBillPrint) {
+  elements.captainBillPrint.addEventListener("click", () => {
+    window.print();
+  });
+}
+
+if (elements.captainDeliveryList) {
+  elements.captainDeliveryList.addEventListener("click", (event) => {
+    const confirmButton = event.target.closest("[data-captain-delivery-confirm]");
+    if (!confirmButton) return;
+    openCaptainDeliveryPopup(Number(confirmButton.dataset.captainDeliveryConfirm), confirmButton);
+  });
+}
+
+if (elements.captainDeliveryPopup) {
+  elements.captainDeliveryPopup.addEventListener("click", (event) => {
+    if (
+      event.target === elements.captainDeliveryPopup ||
+      event.target.closest("[data-captain-delivery-popup-close]")
+    ) {
+      closeCaptainDeliveryPopup();
+      return;
+    }
+
+    if (event.target.closest("[data-captain-delivery-popup-yes]")) {
+      confirmCaptainDeliveryPopup();
+    }
+  });
 }
 
 if (elements.ticketsLiveCategories) {
@@ -2893,6 +3306,18 @@ window.addEventListener("resize", () => {
     );
     syncTicketsActionPopup();
   }
+
+  if (
+    state.page === "captain-delivery" &&
+    Number.isInteger(state.captainDeliveryPromptIndex) &&
+    elements.captainDeliveryList
+  ) {
+    const anchorElement = elements.captainDeliveryList.querySelector(
+      `[data-captain-delivery-confirm="${state.captainDeliveryPromptIndex}"]`,
+    );
+    state.captainDeliveryPopupPosition = computeCaptainDeliveryPopupPosition(anchorElement);
+    syncCaptainDeliveryPopup();
+  }
 });
 
 window.addEventListener("hashchange", syncRoute);
@@ -2904,6 +3329,10 @@ window.setInterval(() => {
 
   if (state.page === "tickets" && elements.ticketsList) {
     updateTicketTimers();
+  }
+
+  if (state.page === "captain-delivery" && elements.captainDeliveryList) {
+    updateCaptainDeliveryTimers();
   }
 }, 1000);
 

@@ -6,14 +6,6 @@ create table if not exists restaurant_tables (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists dining_tables (
-  id bigint generated always as identity primary key,
-  table_number integer not null unique,
-  is_active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table if not exists menu_categories (
   id bigint generated always as identity primary key,
   name text not null unique,
@@ -39,15 +31,14 @@ create table if not exists menu_items (
 
 create table if not exists orders (
   id bigint generated always as identity primary key,
-  table_number integer not null references restaurant_tables(table_number) on update cascade,
-  table_id bigint not null references dining_tables(id) on update cascade,
+  table_id integer not null references restaurant_tables(table_number) on update cascade,
   status text not null default 'open' check (status in ('open', 'shared', 'closed', 'cancelled')),
   shared_at timestamptz,
   opened_at timestamptz not null default now(),
   closed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (table_number)
+  unique (table_id)
 );
 
 create table if not exists order_items (
@@ -74,8 +65,7 @@ create table if not exists order_items (
 );
 
 alter table orders add column if not exists shared_at timestamptz;
-alter table orders add column if not exists table_number integer;
-alter table orders add column if not exists table_id bigint;
+alter table orders add column if not exists table_id integer;
 alter table orders add column if not exists status text not null default 'open';
 alter table orders add column if not exists opened_at timestamptz;
 alter table orders add column if not exists closed_at timestamptz;
@@ -84,9 +74,6 @@ alter table orders add column if not exists updated_at timestamptz;
 
 alter table restaurant_tables add column if not exists created_at timestamptz;
 alter table restaurant_tables add column if not exists updated_at timestamptz;
-
-alter table dining_tables add column if not exists created_at timestamptz;
-alter table dining_tables add column if not exists updated_at timestamptz;
 
 alter table menu_categories add column if not exists created_at timestamptz;
 alter table menu_categories add column if not exists updated_at timestamptz;
@@ -105,7 +92,6 @@ alter table order_items add column if not exists created_at timestamptz;
 alter table order_items add column if not exists updated_at timestamptz;
 
 create index if not exists menu_items_category_id_idx on menu_items(category_id);
-create index if not exists orders_table_number_idx on orders(table_number);
 create index if not exists orders_table_id_idx on orders(table_id);
 create index if not exists orders_status_idx on orders(status);
 create index if not exists orders_shared_at_idx on orders(shared_at);
@@ -150,14 +136,12 @@ before update on order_items
 for each row execute function set_updated_at();
 
 alter table restaurant_tables enable row level security;
-alter table dining_tables enable row level security;
 alter table menu_categories enable row level security;
 alter table menu_items enable row level security;
 alter table orders enable row level security;
 alter table order_items enable row level security;
 
 grant select on restaurant_tables to anon, authenticated;
-grant select, insert, update, delete on dining_tables to anon, authenticated;
 grant select on menu_categories to anon, authenticated;
 grant select on menu_items to anon, authenticated;
 grant select, insert, update, delete on orders to anon, authenticated;
@@ -170,14 +154,6 @@ on restaurant_tables
 for select
 to anon, authenticated
 using (true);
-
-drop policy if exists "manage dining tables" on dining_tables;
-create policy "manage dining tables"
-on dining_tables
-for all
-to anon, authenticated
-using (true)
-with check (true);
 
 drop policy if exists "read menu categories" on menu_categories;
 create policy "read menu categories"
@@ -215,12 +191,6 @@ from generate_series(1, 20) as gs
 on conflict (table_number) do update
 set label = excluded.label,
     is_active = true;
-
-insert into dining_tables (table_number)
-select gs
-from generate_series(1, 20) as gs
-on conflict (table_number) do update
-set is_active = true;
 
 insert into menu_categories (name, display_order)
 values
