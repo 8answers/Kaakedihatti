@@ -2936,6 +2936,72 @@ body.modal-open {
   }
 }
 
+@media (min-width: 901px) and (max-width: 1440px) {
+  .sous-chef-shell,
+  .tickets-shell {
+    flex-direction: column;
+    gap: 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .sous-chef-divider,
+  .tickets-divider {
+    display: none;
+  }
+
+  .menu-shell {
+    flex-direction: row;
+    gap: 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    align-items: stretch;
+  }
+
+  .menu-panel--order {
+    flex: 0 0 clamp(420px, 38vw, 571px);
+    width: clamp(420px, 38vw, 571px);
+    max-width: clamp(420px, 38vw, 571px);
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+    border-top: 0;
+  }
+
+  .tickets-canvas,
+  .tickets-sidebar {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .table-grid {
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: 12px;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .table-grid--sous-chef {
+    width: 100%;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    row-gap: 12px;
+    justify-content: stretch;
+  }
+
+  .table-grid--sous-chef .table-tile,
+  .table-grid .table-tile {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    font-size: 18px;
+    padding: 8px 12px;
+  }
+
+  .content--captain {
+    padding: 12px 8px 0;
+  }
+}
+
 @media (max-width: 900px) {
   .content--sous-chef {
     padding-top: 16px;
@@ -2978,16 +3044,18 @@ body.modal-open {
   }
 
   .table-grid--sous-chef {
-    grid-template-columns: repeat(4, 72px);
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     column-gap: 12px;
     row-gap: 19px;
-    width: fit-content;
-    flex: 0 0 auto;
+    width: 100%;
+    flex: 1 1 auto;
+    justify-content: stretch;
   }
 
   .table-grid--sous-chef .table-tile {
-    width: 72px;
-    height: 72px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
     font-size: 18px;
     padding: 8px 12px;
   }
@@ -3133,13 +3201,18 @@ body.modal-open {
   }
 
   .table-grid {
-    grid-template-columns: repeat(12, 72px);
+    grid-template-columns: repeat(auto-fit, 72px);
     gap: 12px;
+    width: 100%;
+    justify-content: center;
   }
 
   .table-grid--sous-chef {
+    grid-template-columns: repeat(auto-fit, 72px);
     column-gap: 12px;
     row-gap: 19px;
+    width: 100%;
+    justify-content: center;
   }
 
   .sous-chef-shell {
