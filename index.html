@@ -469,7 +469,7 @@
                 <button
                   class="menu-panel__header-action"
                   type="button"
-                  data-order-new
+                  data-order-close
                   hidden
                 >
                   Close
@@ -562,6 +562,86 @@
                   Add
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div class="payment-close-modal" data-payment-close-modal hidden aria-hidden="true">
+            <div
+              class="payment-close-modal__dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="payment-close-title"
+            >
+              <div class="payment-close-modal__header">
+                <div class="payment-close-modal__title" id="payment-close-title">
+                  Payment Received?
+                </div>
+                <button
+                  class="payment-close-modal__close"
+                  type="button"
+                  data-payment-close-dismiss
+                  aria-label="Close payment popup"
+                >
+                  <svg viewBox="0 0 10.486 10.486" aria-hidden="true" focusable="false">
+                    <path
+                      d="M5.243 5.243l-5.243 5.243m5.242-5.243l5.244-5.243m-10.486 0l5.242 5.243m5.244 5.243l-5.243-5.243"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+
+              <p class="payment-close-modal__description">
+                Please confirm that payment has been received and select the payment method.
+              </p>
+
+              <label class="payment-close-modal__select-wrap">
+                <span class="sr-only">Payment method</span>
+                <select class="payment-close-modal__select" data-payment-method required>
+                  <option value="">Payment Method</option>
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="swiggy">Swiggy</option>
+                  <option value="zomato">Zomato</option>
+                </select>
+                <svg
+                  class="payment-close-modal__select-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M6 9l6 6 6-6"></path>
+                </svg>
+              </label>
+
+              <label class="payment-close-modal__upload">
+                <input
+                  class="payment-close-modal__file"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  data-payment-receipt
+                />
+                <svg class="payment-close-modal__upload-icon" viewBox="0 0 32 26" aria-hidden="true" focusable="false">
+                  <path d="M10 7l2-4h8l2 4h6v17H4V7h6z"></path>
+                  <circle cx="16" cy="15" r="5"></circle>
+                </svg>
+                <span data-payment-receipt-label>Upload Payment Image</span>
+              </label>
+
+              <div class="payment-close-modal__history">
+                <p>To view this bill after closing, go to History.</p>
+                <p>Table Overview (Captain) → History</p>
+              </div>
+
+              <button
+                class="payment-close-modal__confirm"
+                type="button"
+                data-payment-close-confirm
+                disabled
+              >
+                Close
+              </button>
             </div>
           </div>
         </main>

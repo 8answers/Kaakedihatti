@@ -417,7 +417,13 @@ const elements = {
   orderShare: document.querySelector("[data-order-share]"),
   orderBill: document.querySelector("[data-order-bill]"),
   orderDelivered: document.querySelector("[data-order-delivered]"),
-  orderNew: document.querySelector("[data-order-new]"),
+  orderClose: document.querySelector("[data-order-close]"),
+  paymentCloseModal: document.querySelector("[data-payment-close-modal]"),
+  paymentCloseDismiss: document.querySelector("[data-payment-close-dismiss]"),
+  paymentMethod: document.querySelector("[data-payment-method]"),
+  paymentReceipt: document.querySelector("[data-payment-receipt]"),
+  paymentReceiptLabel: document.querySelector("[data-payment-receipt-label]"),
+  paymentCloseConfirm: document.querySelector("[data-payment-close-confirm]"),
   dishModal: document.querySelector("[data-dish-modal]"),
   dishModalTitle: document.querySelector("[data-dish-modal-title]"),
   dishModalNote: document.querySelector("[data-dish-modal-note]"),
@@ -452,6 +458,9 @@ const state = {
   billDeliveryPromptIndex: null,
   billDeliveryPopupPosition: null,
   editingOrderIndex: null,
+  paymentCloseOpen: false,
+  paymentMethod: "",
+  paymentReceiptFileName: "",
 };
 
 let databaseHydrated = false;
@@ -624,16 +633,90 @@ function getTableVisualState(tableNumber, { publishedOnly = false } = {}) {
   return hasPreparingItem ? "preparing" : "live";
 }
 
-function applyTableVisualState(button, visualState, tableNumber) {
+function getSousChefTableVisualState(tableNumber) {
+  const orderItems = state.tableOrders.get(tableNumber) || [];
+  const activePublishedItems = orderItems.filter(
+    (item) => isPublishedOrderItem(item) && item.acceptance !== "delivered",
+  );
+
+  if (!activePublishedItems.length) return "empty";
+
+  const hasPreparingItem = activePublishedItems.some(
+    (item) => item.acceptance === "out" || item.acceptance === "accepted",
+  );
+  return hasPreparingItem ? "preparing" : "live";
+}
+
+function getCaptainTableVisualState(tableNumber) {
+  const orderItems = state.tableOrders.get(tableNumber) || [];
+  if (!orderItems.length) {
+    return {
+      state: "empty",
+      hasReadyDot: false,
+    };
+  }
+
+  const unsettledItems = orderItems.filter((item) => !Number.isFinite(item.captainDeliveredAt));
+  if (!unsettledItems.length) {
+    return {
+      state: "captain-delivered",
+      hasReadyDot: false,
+    };
+  }
+
+  const hasReadyDot = unsettledItems.some((item) => item.acceptance === "delivered");
+
+  const publishedItems = unsettledItems.filter((item) => isPublishedOrderItem(item));
+  if (publishedItems.length) {
+    const hasChefVisibleItems = publishedItems.some((item) => item.acceptance !== "delivered");
+    const hasPreparingItem = publishedItems.some(
+      (item) => item.acceptance === "out" || item.acceptance === "accepted",
+    );
+
+    return {
+      state: !hasChefVisibleItems ? "chef-delivered" : hasPreparingItem ? "preparing" : "live",
+      hasReadyDot,
+    };
+  }
+
+  const draftItems = unsettledItems.filter((item) => !isPublishedOrderItem(item));
+  if (draftItems.length) {
+    return {
+      state: "live",
+      hasReadyDot,
+    };
+  }
+
+  const hasPreparingItem = unsettledItems.some(
+    (item) =>
+      item.acceptance === "out" ||
+      item.acceptance === "accepted" ||
+      item.acceptance === "delivered",
+  );
+
+  return {
+    state: !hasChefVisibleItems ? "chef-delivered" : hasPreparingItem ? "preparing" : "live",
+    hasReadyDot,
+  };
+}
+
+function applyTableVisualState(button, visualState, tableNumber, { hasReadyDot = false } = {}) {
   button.classList.toggle("table-tile--live", visualState === "live");
   button.classList.toggle("table-tile--preparing", visualState === "preparing");
+  button.classList.toggle("table-tile--chef-delivered", visualState === "chef-delivered");
+  button.classList.toggle("table-tile--captain-delivered", visualState === "captain-delivered");
+  button.classList.toggle("table-tile--captain-ready", hasReadyDot);
   button.setAttribute(
     "aria-label",
-    visualState === "preparing"
-      ? `Table ${tableNumber}, preparing order`
-      : visualState === "live"
-        ? `Table ${tableNumber}, new order`
-        : `Table ${tableNumber}`,
+    visualState === "captain-delivered"
+      ? `Table ${tableNumber}, delivered to table`
+      : visualState === "chef-delivered"
+        ? `Table ${tableNumber}, kitchen delivered order`
+        : visualState === "preparing"
+          ? `Table ${tableNumber}, preparing order`
+          : visualState === "live"
+            ? `Table ${tableNumber}, new order`
+            : `Table ${tableNumber}`,
   );
 }
 
@@ -1011,6 +1094,19 @@ function showPage(pageName) {
   }
 }
 
+function isElementVisible(element) {
+  return Boolean(element && !element.hidden);
+}
+
+function syncBodyModalOpen() {
+  const hasOpenModal = [
+    elements.dishModal,
+    elements.ticketsActionPopup,
+    elements.paymentCloseModal,
+  ].some(isElementVisible);
+  document.body.classList.toggle("modal-open", hasOpenModal);
+}
+
 function toggleCategory(categoryName) {
   if (state.expandedCategories.has(categoryName)) {
     state.expandedCategories.clear();
@@ -1116,7 +1212,7 @@ function syncDishPopup() {
   syncDishPopupBounds(isOpen && isEditing);
   elements.dishModal.hidden = !isOpen;
   elements.dishModal.setAttribute("aria-hidden", isOpen ? "false" : "true");
-  document.body.classList.toggle("modal-open", isOpen);
+  syncBodyModalOpen();
 
   if (!isOpen || !state.selectedDish) return;
 
@@ -1219,6 +1315,105 @@ function startNewOrder() {
   renderCaptain();
   renderSousChef();
   renderTickets();
+}
+
+function resetPaymentCloseForm() {
+  state.paymentCloseOpen = false;
+  state.paymentMethod = "";
+  state.paymentReceiptFileName = "";
+
+  if (elements.paymentMethod) {
+    elements.paymentMethod.value = "";
+  }
+
+  if (elements.paymentReceipt) {
+    elements.paymentReceipt.value = "";
+  }
+}
+
+function syncPaymentCloseModal() {
+  if (!elements.paymentCloseModal) return;
+
+  const shouldShow = state.paymentCloseOpen && state.page === "menu" && state.order.length > 0;
+  const canClose = Boolean(state.paymentMethod && state.paymentReceiptFileName);
+  const canUploadReceipt = Boolean(state.paymentMethod);
+
+  elements.paymentCloseModal.hidden = !shouldShow;
+  elements.paymentCloseModal.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+
+  if (elements.paymentMethod && elements.paymentMethod.value !== state.paymentMethod) {
+    elements.paymentMethod.value = state.paymentMethod;
+  }
+
+  if (elements.paymentReceiptLabel) {
+    elements.paymentReceiptLabel.textContent = state.paymentReceiptFileName || "Upload Payment Image";
+  }
+
+  if (elements.paymentReceipt) {
+    elements.paymentReceipt.disabled = !canUploadReceipt;
+    elements.paymentReceipt.setAttribute("aria-disabled", canUploadReceipt ? "false" : "true");
+  }
+
+  elements.paymentCloseModal.classList.toggle(
+    "payment-close-modal--has-receipt",
+    Boolean(state.paymentReceiptFileName),
+  );
+  elements.paymentCloseModal.classList.toggle(
+    "payment-close-modal--payment-selected",
+    canUploadReceipt,
+  );
+
+  if (elements.paymentCloseConfirm) {
+    elements.paymentCloseConfirm.disabled = !canClose;
+    elements.paymentCloseConfirm.classList.toggle("payment-close-modal__confirm--active", canClose);
+    elements.paymentCloseConfirm.setAttribute("aria-disabled", canClose ? "false" : "true");
+  }
+
+  syncBodyModalOpen();
+}
+
+function openPaymentClosePopup() {
+  if (!state.order.length) return;
+
+  resetPaymentCloseForm();
+  state.paymentCloseOpen = true;
+  syncPaymentCloseModal();
+
+  requestAnimationFrame(() => {
+    elements.paymentMethod?.focus({ preventScroll: true });
+  });
+}
+
+function closePaymentClosePopup() {
+  if (!state.paymentCloseOpen) return;
+
+  resetPaymentCloseForm();
+  syncPaymentCloseModal();
+}
+
+function completePaymentClose() {
+  if (!state.order.length || !state.paymentMethod || !state.paymentReceiptFileName) return;
+
+  const tableNumber = state.tableNumber;
+  state.tableOrders.set(tableNumber, []);
+  state.captainDraftStartedAtByTable.delete(tableNumber);
+  state.order = [];
+  state.selectedDish = null;
+  state.selectedDishQuantity = 1;
+  state.selectedDishNote = "";
+  state.selectedDishReceivedAt = null;
+  state.editingOrderIndex = null;
+  state.captainDeliveryPromptIndex = null;
+  state.captainDeliveryPopupPosition = null;
+  resetPaymentCloseForm();
+
+  enqueueDatabaseWrite(() => persistOrderToDatabase(tableNumber, []));
+  renderMenu();
+  renderCaptain();
+  renderSousChef();
+  renderTickets();
+  syncPaymentCloseModal();
+  setRoute("captain");
 }
 
 function buildOrderColumnsMarkup() {
@@ -1701,7 +1896,7 @@ function syncTicketsActionPopup() {
     elements.ticketsActionPopup.style.top = "";
   }
 
-  document.body.classList.toggle("modal-open", shouldShow);
+  syncBodyModalOpen();
 }
 
 function openTicketsActionPopup(tableNumber, index, mode, anchorElement) {
@@ -1775,6 +1970,12 @@ function clearTicketsActionState() {
   state.ticketsActionPopupPosition = null;
 }
 
+function renderKitchenStatusDependents() {
+  renderCaptain();
+  renderSousChef();
+  renderTickets();
+}
+
 function goToChefTableOverview() {
   clearTicketsActionState();
   state.ticketsViewMode = "overview";
@@ -1792,7 +1993,7 @@ function applyTicketsAcceptance(acceptance) {
 
   setTicketAcceptance(state.ticketsActionTableNumber, state.ticketsActionIndex, acceptance);
   clearTicketsActionState();
-  renderTickets();
+  renderKitchenStatusDependents();
 }
 
 function confirmTicketsDelivery() {
@@ -1807,7 +2008,7 @@ function confirmTicketsDelivery() {
 
   setTicketAcceptance(tableNumber, state.ticketsActionIndex, "delivered");
   clearTicketsActionState();
-  renderTickets();
+  renderKitchenStatusDependents();
 }
 
 function toggleTicketsSidebar() {
@@ -1960,8 +2161,8 @@ function renderMenu() {
     elements.orderFooter.style.display = state.order.length > 0 ? "flex" : "none";
   }
 
-  if (elements.orderNew) {
-    elements.orderNew.hidden = state.order.length === 0;
+  if (elements.orderClose) {
+    elements.orderClose.hidden = state.order.length === 0;
   }
 
   if (elements.orderShare) {
@@ -1973,6 +2174,7 @@ function renderMenu() {
 
   persistCurrentOrder();
   syncDishPopup();
+  syncPaymentCloseModal();
 }
 
 function getDishUnitPrice(categoryName) {
@@ -2211,11 +2413,13 @@ function confirmBillDeliveryPopup() {
     const allOrdersDelivered =
       state.order.length > 0 && state.order.every((item) => item.acceptance === "delivered");
     if (allOrdersDelivered) {
+      renderCaptain();
       goToChefTableOverview();
       return;
     }
 
     renderBill();
+    renderKitchenStatusDependents();
   } else {
     closeBillDeliveryPopup();
   }
@@ -2564,7 +2768,10 @@ function renderCaptain() {
   elements.captainTableGrid.querySelectorAll(".table-tile").forEach((button) => {
     const tableNumber = Number(button.textContent.trim());
     if (!Number.isFinite(tableNumber)) return;
-    applyTableVisualState(button, getTableVisualState(tableNumber), tableNumber);
+    const tableVisualState = getCaptainTableVisualState(tableNumber);
+    applyTableVisualState(button, tableVisualState.state, tableNumber, {
+      hasReadyDot: tableVisualState.hasReadyDot,
+    });
   });
 }
 
@@ -2604,7 +2811,7 @@ function renderSousChef() {
   elements.sousChefTableGrid.querySelectorAll(".table-tile").forEach((button) => {
     const tableNumber = Number(button.textContent.trim());
     if (!Number.isFinite(tableNumber)) return;
-    applyTableVisualState(button, getTableVisualState(tableNumber, { publishedOnly: true }), tableNumber);
+    applyTableVisualState(button, getSousChefTableVisualState(tableNumber), tableNumber);
   });
 
   const liveCategoryNames = getLiveCategoryNames(getActiveTicketData());
@@ -2845,6 +3052,7 @@ function syncRoute() {
     state.billDeliveryPromptIndex = null;
     state.billDeliveryPopupPosition = null;
     state.editingOrderIndex = null;
+    resetPaymentCloseForm();
     loadOrderForTable(route.tableNumber);
   } else {
     state.selectedDish = null;
@@ -2860,6 +3068,7 @@ function syncRoute() {
     state.billDeliveryPromptIndex = null;
     state.billDeliveryPopupPosition = null;
     state.editingOrderIndex = null;
+    resetPaymentCloseForm();
     if (wasOrderRoute) {
       state.order = [];
     }
@@ -2867,6 +3076,7 @@ function syncRoute() {
 
   showPage(route.page);
   syncDishPopup();
+  syncPaymentCloseModal();
 
   if (route.page === "menu") {
     renderMenu();
@@ -2963,8 +3173,44 @@ if (elements.orderDelivered) {
   });
 }
 
-if (elements.orderNew) {
-  elements.orderNew.addEventListener("click", startNewOrder);
+if (elements.orderClose) {
+  elements.orderClose.addEventListener("click", openPaymentClosePopup);
+}
+
+if (elements.paymentCloseModal) {
+  elements.paymentCloseModal.addEventListener("click", (event) => {
+    if (
+      event.target === elements.paymentCloseModal ||
+      event.target.closest("[data-payment-close-dismiss]")
+    ) {
+      closePaymentClosePopup();
+    }
+  });
+}
+
+if (elements.paymentMethod) {
+  elements.paymentMethod.addEventListener("change", (event) => {
+    state.paymentMethod = event.target.value;
+    if (!state.paymentMethod) {
+      state.paymentReceiptFileName = "";
+      if (elements.paymentReceipt) {
+        elements.paymentReceipt.value = "";
+      }
+    }
+    syncPaymentCloseModal();
+  });
+}
+
+if (elements.paymentReceipt) {
+  elements.paymentReceipt.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    state.paymentReceiptFileName = file?.name || "";
+    syncPaymentCloseModal();
+  });
+}
+
+if (elements.paymentCloseConfirm) {
+  elements.paymentCloseConfirm.addEventListener("click", completePaymentClose);
 }
 
 if (elements.captainBillList) {
@@ -3081,7 +3327,7 @@ if (elements.ticketsList) {
     if (rejectButton) {
       clearTicketsActionState();
       setTicketAcceptance(Number(rejectButton.dataset.ticketTable), Number(rejectButton.dataset.ticketReject), "rejected");
-      renderTickets();
+      renderKitchenStatusDependents();
       return;
     }
 
@@ -3089,7 +3335,7 @@ if (elements.ticketsList) {
     if (acceptButton) {
       clearTicketsActionState();
       setTicketAcceptance(Number(acceptButton.dataset.ticketTable), Number(acceptButton.dataset.ticketAccept), "out");
-      renderTickets();
+      renderKitchenStatusDependents();
       return;
     }
 
@@ -3111,7 +3357,7 @@ if (elements.ticketsList) {
     const tableNumber = Number(resetButton.dataset.ticketTable);
     const itemIndex = Number(resetButton.dataset.ticketReset);
     setTicketAcceptance(tableNumber, itemIndex, null);
-    renderTickets();
+    renderKitchenStatusDependents();
   });
 }
 
@@ -3161,6 +3407,7 @@ if (elements.billList) {
         }
         persistCurrentOrder();
         renderBill();
+        renderKitchenStatusDependents();
       }
       return;
     }
@@ -3187,6 +3434,7 @@ if (elements.billList) {
         state.billDeliveryPromptIndex = null;
         persistCurrentOrder();
         renderBill();
+        renderKitchenStatusDependents();
       }
       return;
     }
@@ -3205,6 +3453,7 @@ if (elements.billList) {
       }
       persistCurrentOrder();
       renderBill();
+      renderKitchenStatusDependents();
     }
   });
 }
@@ -3262,7 +3511,14 @@ if (elements.dishModalNote) {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && state.selectedDish) {
+  if (event.key !== "Escape") return;
+
+  if (state.paymentCloseOpen) {
+    closePaymentClosePopup();
+    return;
+  }
+
+  if (state.selectedDish) {
     closeDishPopup();
   }
 });
