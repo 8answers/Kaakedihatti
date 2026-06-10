@@ -21,7 +21,9 @@
 
         <main class="content content--home" aria-label="Role selection">
           <div class="role-stack">
-            <button class="role-button" type="button">Admin</button>
+            <button class="role-button" type="button" data-nav="admin">
+              Admin
+            </button>
             <button class="role-button" type="button" data-nav="captain">
               Captain
             </button>
@@ -31,6 +33,78 @@
             <button class="role-button" type="button" data-nav="cashier">
               Cashier
             </button>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen" data-page="login" hidden>
+        <header class="topbar" aria-label="Home">
+          <span class="topbar__title">Home</span>
+        </header>
+
+        <main class="content content--login" aria-label="Role login">
+          <form class="login-form" data-login-form>
+            <div class="login-form__title" data-login-title>Admin Log-in</div>
+
+            <label class="login-form__field">
+              <span>Username (Max 10 Char)</span>
+              <input
+                class="login-form__input"
+                type="text"
+                name="username"
+                placeholder="Enter Username"
+                maxlength="10"
+                autocomplete="username"
+                data-login-username
+                required
+              />
+            </label>
+
+            <label class="login-form__field">
+              <span>Password (5 Char)</span>
+              <input
+                class="login-form__input"
+                type="password"
+                name="password"
+                placeholder="Enter Password"
+                maxlength="5"
+                minlength="5"
+                autocomplete="current-password"
+                data-login-password
+                required
+              />
+            </label>
+
+            <p class="login-form__error" data-login-error aria-live="polite"></p>
+            <button class="login-form__submit" type="submit" hidden>Log In</button>
+          </form>
+        </main>
+      </section>
+
+      <section class="screen screen--admin" data-page="admin" hidden>
+        <header class="topbar topbar--admin" aria-label="Admin">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="home"
+            aria-label="Back to home"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
+          <span class="topbar__title" data-admin-title>Admin</span>
+        </header>
+
+        <main class="content content--admin" aria-label="Admin workspace">
+          <div class="admin-shell">
+            <section class="admin-main" data-admin-main aria-live="polite"></section>
+
+            <div class="admin-divider" aria-hidden="true">
+              <div class="admin-divider__handle">
+                <img src="./Collapse.png" alt="" aria-hidden="true" />
+              </div>
+            </div>
+
+            <aside class="admin-sidebar" data-admin-sidebar aria-label="Admin navigation"></aside>
           </div>
         </main>
       </section>
@@ -196,8 +270,8 @@
           <button
             class="topbar__icon-button"
             type="button"
-            data-nav="sous-chef"
-            aria-label="Back to table overview"
+            data-nav="tickets-back"
+            aria-label="Back"
           >
             <span class="topbar__icon" aria-hidden="true">‹</span>
           </button>

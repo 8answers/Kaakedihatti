@@ -47,8 +47,13 @@ body.modal-open {
 }
 
 .topbar--captain,
-.topbar--menu {
+.topbar--menu,
+.topbar--admin {
   gap: 16px;
+}
+
+.topbar--admin .topbar__title {
+  font-weight: 400;
 }
 
 .topbar__icon-button {
@@ -136,6 +141,71 @@ body.modal-open {
   position: relative;
 }
 
+.content--admin {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 32px 0 0;
+  position: relative;
+}
+
+.content--login {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.login-form {
+  width: min(400px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 32px;
+  transform: translateY(-8px);
+}
+
+.login-form__title {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  padding: 10px 24px;
+  text-align: center;
+}
+
+.login-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.login-form__input {
+  width: 100%;
+  min-height: 59px;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  padding: 16px;
+}
+
+.login-form__input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.login-form__error {
+  min-height: 24px;
+  margin: -16px 0 0;
+  color: #ff1212;
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .role-stack {
   display: flex;
   flex-direction: column;
@@ -168,6 +238,7 @@ body.modal-open {
 }
 
 .role-button:focus-visible,
+.login-form__input:focus-visible,
 .topbar__icon-button:focus-visible,
 .table-tile:focus-visible,
 .dish-button:focus-visible,
@@ -180,7 +251,10 @@ body.modal-open {
 .order-item__edit:focus-visible,
 .order-delivered:focus-visible,
 .order-bill:focus-visible,
-.order-share:focus-visible {
+.order-share:focus-visible,
+.admin-sidebar__row:focus-visible,
+.admin-table-grid .table-tile:focus-visible,
+.admin-date-nav:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
@@ -286,6 +360,853 @@ body.modal-open {
   background: #c7ae0c;
   color: #fff;
   cursor: pointer;
+}
+
+.admin-shell {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  padding-left: 24px;
+}
+
+.admin-main {
+  position: relative;
+  flex: 0 0 933px;
+  width: 933px;
+  max-width: 933px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-dashboard {
+  width: 100%;
+  margin: 0;
+  padding-left: 36px;
+  color: #fff;
+  font-size: 24px;
+  line-height: normal;
+}
+
+.admin-dashboard li {
+  margin: 0;
+}
+
+.admin-main__empty {
+  min-height: 40px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-table-grid {
+  grid-template-columns: repeat(8, 100px);
+  width: 933px;
+  gap: 19px;
+}
+
+.admin-settings {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+}
+
+.admin-settings__content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  width: 100%;
+}
+
+.admin-settings__content--blurred {
+  filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.admin-settings__roles {
+  min-height: 52px;
+  background: #262626;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.admin-settings__role {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: 400 32px/1 "Kulim Park", sans-serif;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.admin-settings__role--selected {
+  background: #fff;
+  color: #000;
+}
+
+.admin-settings__add-row {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.admin-settings__add {
+  width: 256px;
+  min-height: 43px;
+  border: 0;
+  background: #0084ff;
+  color: #fff;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  cursor: pointer;
+  padding: 8px 24px;
+}
+
+.admin-settings__header,
+.admin-settings__member-row {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-settings__member-row {
+  background: #191919;
+}
+
+.admin-settings__members {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-settings__cell--name {
+  width: 290px;
+}
+
+.admin-settings__cell--username,
+.admin-settings__cell--password {
+  width: 220px;
+  text-align: center;
+}
+
+.admin-settings__delete-spacer,
+.admin-settings__delete {
+  width: 16px;
+  height: 18px;
+  flex: 0 0 16px;
+}
+
+.admin-settings__delete {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+
+.admin-settings__trash {
+  position: absolute;
+  left: 3px;
+  bottom: 0;
+  width: 10px;
+  height: 12px;
+  border: 2px solid #ff1212;
+  border-top: 0;
+  box-sizing: border-box;
+}
+
+.admin-settings__trash::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 12px;
+  height: 2px;
+  background: #ff1212;
+}
+
+.admin-settings__trash::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: -7px;
+  width: 4px;
+  height: 2px;
+  border: 2px solid #ff1212;
+  border-bottom: 0;
+}
+
+.admin-settings__empty-row {
+  min-height: 40px;
+  background: #191919;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  padding: 8px 24px;
+}
+
+.admin-member-modal {
+  position: absolute;
+  left: 154px;
+  top: 174px;
+  z-index: 20;
+  width: 571px;
+  background: #fff;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+.admin-member-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 0;
+}
+
+.admin-member-modal__header h2 {
+  margin: 0;
+  font: 700 24px/1 "Kulim Park", sans-serif;
+}
+
+.admin-member-modal__close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-member-modal__close span::before,
+.admin-member-modal__close span::after {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: -1px;
+  width: 2px;
+  height: 27px;
+  background: #000;
+}
+
+.admin-member-modal__close span::before {
+  transform: rotate(45deg);
+}
+
+.admin-member-modal__close span::after {
+  transform: rotate(-45deg);
+}
+
+.admin-member-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #000;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-member-modal__input {
+  width: 100%;
+  min-height: 59px;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.admin-member-modal__input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.admin-member-modal__submit {
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  background: #0084ff;
+  color: #fff;
+  font: 700 32px/1 "Kulim Park", sans-serif;
+  cursor: pointer;
+  padding: 8px 24px;
+}
+
+.admin-sidebar.admin-sidebar--settings {
+  height: 100%;
+  justify-content: space-between;
+}
+
+.admin-sidebar__logout {
+  width: 100%;
+  min-height: 43px;
+  border: 0;
+  background: #ff1212;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  cursor: pointer;
+  padding: 8px 24px;
+}
+
+.admin-sidebar__logout-icon {
+  width: 20px;
+  height: 18px;
+  display: block;
+  object-fit: contain;
+}
+
+.admin-settings__role:focus-visible,
+.admin-settings__add:focus-visible,
+.admin-settings__delete:focus-visible,
+.admin-member-modal__close:focus-visible,
+.admin-member-modal__input:focus-visible,
+.admin-member-modal__submit:focus-visible,
+.admin-sidebar__logout:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.admin-member-modal__input:focus-visible {
+  outline-color: #0084ff;
+}
+
+.admin-divider {
+  position: relative;
+  flex: 0 0 1px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.admin-divider__handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 33px;
+  transform: translate(-50%, -50%);
+}
+
+.admin-divider__handle img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.admin-sidebar {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 16px;
+  padding-top: 24px;
+}
+
+.admin-sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.admin-sidebar__row,
+.admin-sidebar__heading,
+.admin-sidebar__empty {
+  min-height: 40px;
+  padding: 8px 24px;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.admin-sidebar__row {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: #191919;
+  color: #fff;
+  cursor: pointer;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.admin-sidebar__row--selected {
+  background: #fff;
+  color: #000;
+  justify-content: space-between;
+}
+
+.admin-sidebar__heading {
+  color: #fff;
+  justify-content: center;
+  text-align: center;
+}
+
+.admin-sidebar__empty {
+  color: #fff;
+  justify-content: center;
+}
+
+.admin-sidebar__icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.admin-sidebar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-attendance {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.admin-attendance__date {
+  min-height: 52px;
+  background: #262626;
+  padding: 8px 24px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.admin-date-nav {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-date-nav span {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.admin-attendance__date-current {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-attendance__date-picker-button,
+.admin-attendance__time-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-attendance__date-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 240px;
+  justify-content: center;
+}
+
+.admin-attendance__time-button {
+  width: 100%;
+  text-align: center;
+}
+
+.admin-attendance__picker-input {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.admin-attendance__date > .admin-attendance__picker-input {
+  left: 50%;
+  width: 240px;
+  transform: translateX(-50%);
+}
+
+.admin-attendance__time > .admin-attendance__picker-input {
+  width: 100%;
+}
+
+.admin-attendance__calendar {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  position: relative;
+}
+
+.admin-attendance__calendar::before,
+.admin-attendance__calendar::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 9px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.admin-attendance__calendar::before {
+  left: 7px;
+}
+
+.admin-attendance__calendar::after {
+  right: 7px;
+}
+
+.admin-attendance__calendar-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 2px;
+  background: #fff;
+}
+
+.admin-attendance__head,
+.admin-attendance__row {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-attendance__row {
+  background: #191919;
+}
+
+.admin-attendance__name {
+  width: 119px;
+}
+
+.admin-attendance__metrics {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+}
+
+.admin-attendance__status,
+.admin-attendance__time {
+  width: 121px;
+  text-align: center;
+}
+
+.admin-attendance__time {
+  width: 133px;
+  position: relative;
+}
+
+.admin-attendance__status {
+  position: relative;
+}
+
+.admin-attendance__row--status-open {
+  background: #7a7a7a;
+  position: relative;
+  z-index: 2;
+}
+
+.admin-attendance__status-dropdown {
+  display: inline-flex;
+  position: relative;
+  width: 121px;
+  height: 27px;
+}
+
+.admin-attendance__status-trigger {
+  width: 100%;
+  height: 27px;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: inherit;
+  line-height: 1;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.admin-attendance__status-trigger--present {
+  border-color: #009e12;
+  background: #009e12;
+}
+
+.admin-attendance__status-trigger--absent {
+  border-color: #ff1212;
+  background: #ff1212;
+}
+
+.admin-attendance__status-value {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+}
+
+.admin-attendance__status-chevron {
+  width: 8px;
+  height: 8px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.admin-attendance__status-trigger--open .admin-attendance__status-chevron {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.admin-attendance__status-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 10;
+  width: 121px;
+  padding: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-sizing: border-box;
+}
+
+.admin-attendance__status-option {
+  width: 100%;
+  height: 27px;
+  border: 0;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-attendance__status-option--present {
+  background: #009e12;
+}
+
+.admin-attendance__status-option--absent {
+  background: #ff1212;
+}
+
+.admin-attendance__status-trigger:focus-visible,
+.admin-attendance__status-option:focus-visible,
+.admin-attendance__time-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.admin-attendance__status-select-wrap {
+  display: inline-flex;
+  width: 121px;
+}
+
+.admin-attendance__status-select {
+  width: 100%;
+  height: 27px;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 28px 0 12px;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, #fff 50%), linear-gradient(135deg, #fff 50%, transparent 50%);
+  background-position: calc(100% - 14px) 11px, calc(100% - 8px) 11px;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.admin-attendance__status-select--empty {
+  background-color: transparent;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.admin-attendance__status-select--present {
+  background-color: #009e12;
+  color: #fff;
+}
+
+.admin-attendance__status-select--absent {
+  background-color: #ff1212;
+  color: #fff;
+}
+
+.admin-attendance__status-select option {
+  color: #fff;
+  text-align: center;
+}
+
+.admin-attendance__status-select option[value=""] {
+  background: #7a7a7a;
+}
+
+.admin-attendance__status-select option[value="present"] {
+  background: #009e12;
+}
+
+.admin-attendance__status-select option[value="absent"] {
+  background: #ff1212;
+}
+
+.admin-attendance__status-select:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.admin-ticket-card {
+  width: 459px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 8px;
+  background: #fff;
+  color: #000;
+}
+
+.admin-ticket-card__header {
+  min-height: 40px;
+  padding: 8px 24px;
+  background: #009e12;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.admin-ticket-card__header--live {
+  background: #c7ae0c;
+}
+
+.admin-ticket-card__columns,
+.admin-ticket-card__item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 268px) 50px;
+  column-gap: 16px;
+  align-items: start;
+  padding: 0 24px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.admin-ticket-card__qty,
+.admin-ticket-card__column--qty {
+  text-align: center;
+}
+
+.admin-ticket-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-ticket-card__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #000;
+}
+
+.admin-ticket-card__item--selected {
+  background: #474747;
+  color: #fff;
+  padding: 0;
+}
+
+.admin-ticket-card__note-row {
+  padding: 0 24px 0 52px;
+}
+
+.admin-ticket-card__note {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-ticket-card__item--selected .admin-ticket-card__note {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.admin-ticket-card__empty {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .sous-chef-shell {
@@ -721,7 +1642,8 @@ body.modal-open {
   line-height: 1;
 }
 
-.ticket-card__columns--overview {
+.ticket-card--overview .ticket-card__columns--overview,
+.ticket-card--overview .ticket-card__main--overview {
   grid-template-columns: minmax(0, 268px) 50px 50px;
   column-gap: 16px;
 }
@@ -819,8 +1741,10 @@ body.modal-open {
 }
 
 .ticket-card__main--overview {
+  display: grid;
   grid-template-columns: minmax(0, 268px) 50px 50px;
   column-gap: 16px;
+  justify-content: normal;
 }
 
 .ticket-card__main--category {
@@ -839,10 +1763,15 @@ body.modal-open {
   text-overflow: ellipsis;
 }
 
-.ticket-card--overview .order-item__name,
-.ticket-card--overview .order-item__qty {
+.ticket-card--overview .ticket-card__name,
+.ticket-card--overview .ticket-card__qty {
   color: #000;
   font-size: 16px;
+}
+
+.ticket-card--overview .ticket-card__main--overview {
+  display: grid;
+  justify-content: normal;
 }
 
 .ticket-card--overview .order-item__edit {
@@ -853,6 +1782,12 @@ body.modal-open {
 .ticket-card--overview .order-item__edit svg {
   width: 16px;
   height: 16px;
+}
+
+.ticket-card__status--pending {
+  background: transparent;
+  color: currentColor;
+  cursor: default;
 }
 
 .ticket-card--overview .ticket-card__status {
@@ -980,6 +1915,16 @@ body.modal-open {
   background: transparent;
   width: 121px;
   cursor: pointer;
+}
+
+.tickets-shell--readonly .ticket-card__status,
+.tickets-shell--readonly .order-item__edit,
+.tickets-shell--readonly .bill-item__accept {
+  cursor: default;
+}
+
+.tickets-shell--readonly .ticket-card--overview {
+  cursor: default;
 }
 
 .ticket-card__status-image {
@@ -2938,7 +3883,8 @@ body.modal-open {
 
 @media (min-width: 901px) and (max-width: 1440px) {
   .sous-chef-shell,
-  .tickets-shell {
+  .tickets-shell,
+  .admin-shell {
     flex-direction: column;
     gap: 16px;
     padding-left: 16px;
@@ -2946,7 +3892,8 @@ body.modal-open {
   }
 
   .sous-chef-divider,
-  .tickets-divider {
+  .tickets-divider,
+  .admin-divider {
     display: none;
   }
 
@@ -2967,7 +3914,9 @@ body.modal-open {
   }
 
   .tickets-canvas,
-  .tickets-sidebar {
+  .tickets-sidebar,
+  .admin-main,
+  .admin-sidebar {
     flex: 1 1 auto;
     width: 100%;
     max-width: none;
@@ -2980,7 +3929,8 @@ body.modal-open {
     justify-content: stretch;
   }
 
-  .table-grid--sous-chef {
+  .table-grid--sous-chef,
+  .admin-table-grid {
     width: 100%;
     flex: 1 1 auto;
     grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
@@ -2989,7 +3939,8 @@ body.modal-open {
   }
 
   .table-grid--sous-chef .table-tile,
-  .table-grid .table-tile {
+  .table-grid .table-tile,
+  .admin-table-grid .table-tile {
     width: 100%;
     height: auto;
     aspect-ratio: 1;
@@ -3011,13 +3962,18 @@ body.modal-open {
     padding-top: 16px;
   }
 
+  .content--admin {
+    padding-top: 16px;
+  }
+
   .sous-chef-shell {
     flex-direction: column;
     padding-left: 16px;
     padding-right: 16px;
   }
 
-  .tickets-shell {
+  .tickets-shell,
+  .admin-shell {
     flex-direction: column;
     gap: 16px;
     padding-left: 16px;
@@ -3030,20 +3986,23 @@ body.modal-open {
     max-width: none;
   }
 
-  .tickets-sidebar {
+  .tickets-sidebar,
+  .admin-sidebar {
     flex: 1 1 auto;
     width: 100%;
     max-width: none;
     margin-left: 0;
   }
 
-  .tickets-canvas {
+  .tickets-canvas,
+  .admin-main {
     flex: 1 1 auto;
     width: 100%;
     max-width: none;
   }
 
-  .table-grid--sous-chef {
+  .table-grid--sous-chef,
+  .admin-table-grid {
     grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     column-gap: 12px;
     row-gap: 19px;
@@ -3052,7 +4011,8 @@ body.modal-open {
     justify-content: stretch;
   }
 
-  .table-grid--sous-chef .table-tile {
+  .table-grid--sous-chef .table-tile,
+  .admin-table-grid .table-tile {
     width: 100%;
     height: auto;
     aspect-ratio: 1;
@@ -3064,7 +4024,8 @@ body.modal-open {
     display: none;
   }
 
-  .tickets-divider {
+  .tickets-divider,
+  .admin-divider {
     display: none;
   }
 
@@ -3118,7 +4079,10 @@ body.modal-open {
 
   .tickets-sidebar__row,
   .tickets-sidebar__heading,
-  .tickets-sidebar__empty {
+  .tickets-sidebar__empty,
+  .admin-sidebar__row,
+  .admin-sidebar__heading,
+  .admin-sidebar__empty {
     min-height: 40px;
     font-size: 18px;
     padding: 8px 12px;
@@ -3135,6 +4099,41 @@ body.modal-open {
   .tickets-sidebar__icon {
     font-size: 24px;
   }
+
+  .admin-dashboard,
+  .admin-attendance__head,
+  .admin-attendance__row {
+    font-size: 18px;
+  }
+
+  .admin-attendance__date-current {
+    font-size: 24px;
+  }
+
+  .admin-attendance__head,
+  .admin-attendance__row {
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .admin-attendance__metrics {
+    gap: 16px;
+  }
+
+.admin-attendance__status,
+.admin-attendance__status-pill,
+.admin-attendance__status-dropdown,
+.admin-attendance__status-menu {
+  width: 92px;
+}
+
+  .admin-attendance__time {
+    width: 88px;
+  }
+
+  .admin-ticket-card {
+    width: min(459px, 100%);
+  }
 }
 
 @media (max-width: 520px) {
@@ -3144,7 +4143,8 @@ body.modal-open {
   }
 
   .topbar--captain,
-  .topbar--menu {
+  .topbar--menu,
+  .topbar--admin {
     gap: 12px;
   }
 
@@ -3181,6 +4181,10 @@ body.modal-open {
     padding: 16px 0 0;
   }
 
+  .content--admin {
+    padding: 16px 0 0;
+  }
+
   .content--bill {
     padding: 0;
   }
@@ -3207,7 +4211,8 @@ body.modal-open {
     justify-content: center;
   }
 
-  .table-grid--sous-chef {
+  .table-grid--sous-chef,
+  .admin-table-grid {
     grid-template-columns: repeat(auto-fit, 72px);
     column-gap: 12px;
     row-gap: 19px;
@@ -3220,7 +4225,8 @@ body.modal-open {
     padding-right: 0;
   }
 
-  .tickets-shell {
+  .tickets-shell,
+  .admin-shell {
     gap: 16px;
     padding-left: 0;
     padding-right: 0;
@@ -3244,13 +4250,17 @@ body.modal-open {
     width: 100%;
   }
 
-  .tickets-divider {
+  .tickets-divider,
+  .admin-divider {
     display: none;
   }
 
   .tickets-sidebar__row,
   .tickets-sidebar__heading,
-  .tickets-sidebar__empty {
+  .tickets-sidebar__empty,
+  .admin-sidebar__row,
+  .admin-sidebar__heading,
+  .admin-sidebar__empty {
     min-height: 40px;
     font-size: 18px;
     padding: 8px 12px;
@@ -3265,6 +4275,10 @@ body.modal-open {
   }
 
   .tickets-sidebar__icon {
+    font-size: 24px;
+  }
+
+  .admin-sidebar__icon {
     font-size: 24px;
   }
 
@@ -3296,6 +4310,12 @@ body.modal-open {
   .ticket-card__columns,
   .ticket-card__main {
     grid-template-columns: minmax(0, 1fr) 36px 64px 52px;
+    column-gap: 12px;
+  }
+
+  .ticket-card__columns--overview,
+  .ticket-card--overview .ticket-card__main--overview {
+    grid-template-columns: minmax(0, 1fr) 36px 50px;
     column-gap: 12px;
   }
 
@@ -3398,6 +4418,63 @@ body.modal-open {
     height: 72px;
     font-size: 18px;
     padding: 8px 12px;
+  }
+
+  .admin-attendance {
+    gap: 16px;
+  }
+
+  .admin-attendance__date,
+  .admin-attendance__head,
+  .admin-attendance__row {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .admin-attendance__date-current {
+    font-size: 20px;
+    gap: 10px;
+  }
+
+  .admin-attendance__calendar {
+    width: 24px;
+    height: 24px;
+  }
+
+  .admin-attendance__calendar-line {
+    top: 7px;
+  }
+
+  .admin-attendance__name {
+    width: 80px;
+  }
+
+  .admin-attendance__metrics {
+    gap: 8px;
+  }
+
+.admin-attendance__status,
+.admin-attendance__status-pill,
+.admin-attendance__status-dropdown,
+.admin-attendance__status-menu {
+  width: 70px;
+}
+
+  .admin-attendance__time {
+    width: 66px;
+  }
+
+  .admin-ticket-card__columns,
+  .admin-ticket-card__item-main {
+    grid-template-columns: minmax(0, 1fr) 36px;
+    column-gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .admin-ticket-card__note-row {
+    padding-left: 44px;
+    padding-right: 16px;
   }
 
   .menu-panel__body--order {
@@ -3797,5 +4874,68 @@ body.modal-open {
 
   .bill-list-wrap {
     padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-settings__roles {
+    overflow-x: auto;
+    justify-content: flex-start;
+    gap: 16px;
+  }
+
+  .admin-settings__role {
+    flex: 0 0 auto;
+    font-size: 24px;
+  }
+
+  .admin-settings__header,
+  .admin-settings__member-row {
+    min-width: 820px;
+    font-size: 18px;
+  }
+
+  .admin-member-modal {
+    left: 50%;
+    top: 120px;
+    width: min(571px, calc(100% - 32px));
+    transform: translateX(-50%);
+  }
+
+  .admin-sidebar__logout {
+    font-size: 18px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-settings__content {
+    gap: 16px;
+  }
+
+  .admin-settings__roles,
+  .admin-settings__header,
+  .admin-settings__member-row {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .admin-settings__add {
+    width: 100%;
+  }
+
+  .admin-member-modal {
+    top: 80px;
+    gap: 20px;
+    padding: 16px;
+  }
+
+  .admin-member-modal__field,
+  .admin-member-modal__input {
+    font-size: 18px;
+  }
+
+  .admin-member-modal__submit {
+    font-size: 24px;
   }
 }

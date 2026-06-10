@@ -359,6 +359,14 @@ const pages = new Map(
 const elements = {
   navButtons: document.querySelectorAll("[data-nav]"),
   tableButtons: document.querySelectorAll(".table-tile"),
+  loginForm: document.querySelector("[data-login-form]"),
+  loginTitle: document.querySelector("[data-login-title]"),
+  loginError: document.querySelector("[data-login-error]"),
+  loginUsername: document.querySelector("[data-login-username]"),
+  loginPassword: document.querySelector("[data-login-password]"),
+  adminTitle: document.querySelector("[data-admin-title]"),
+  adminMain: document.querySelector("[data-admin-main]"),
+  adminSidebar: document.querySelector("[data-admin-sidebar]"),
   captainTableGrid: document.querySelector('[data-page="captain"] .table-grid'),
   menuTitle: document.querySelector("[data-menu-title]"),
   menuSearch: document.querySelector("[data-menu-search]"),
@@ -445,6 +453,15 @@ const state = {
   selectedDishQuantity: 1,
   selectedDishNote: "",
   selectedDishReceivedAt: null,
+  loginTarget: null,
+  loginError: "",
+  currentUser: null,
+  adminView: "dashboard",
+  adminDate: new Date(),
+  adminAttendanceDropdownIndex: null,
+  adminSettingsRole: "kitchen-supervisor",
+  adminAddMemberOpen: false,
+  ticketsBackRoute: "sous-chef",
   ticketsViewMode: "overview",
   ticketsSelectedCategory: null,
   sousChefSidebarCollapsed: false,
@@ -463,6 +480,44 @@ const state = {
   paymentReceiptFileName: "",
 };
 
+const adminSidebarItems = [
+  { view: "dashboard", route: "admin", label: "Dashboard" },
+  { view: "tables", route: "admin-tables", label: "Table Overview" },
+  { view: "attendance", route: "admin-attendance", label: "Staff Attendance" },
+  { view: "tickets", route: "tickets", label: "Ticket Status" },
+  { view: "settings", route: "admin-settings", label: "Settings" },
+];
+
+const adminSettingsRoles = [
+  { id: "kitchen-supervisor", label: "Kitchen Supervisor", addLabel: "Add Kitchen Supervisor" },
+  { id: "captain", label: "Captain", addLabel: "Add Captain" },
+  { id: "staff", label: "Staff", addLabel: "Add Staff" },
+  { id: "admin", label: "Admin", addLabel: "Add Admin" },
+];
+
+const protectedLoginTargets = {
+  admin: ["admin"],
+  captain: ["captain"],
+  "sous-chef": ["kitchen-supervisor"],
+};
+
+const loginTargetLabels = {
+  admin: "Admin",
+  captain: "Captain",
+  "sous-chef": "Kitchen Supervisor",
+};
+
+const attendanceRoleIds = ["kitchen-supervisor", "captain", "staff"];
+
+const adminMembersByRole = {
+  admin: [{ name: "Admin", username: "admin", password: "12345", id: null }],
+  "kitchen-supervisor": [{ name: "Abc XyZ", username: "ab@kdh", password: "12345" }],
+  captain: [],
+  staff: [],
+};
+
+const adminAttendanceByUsername = new Map();
+
 let databaseHydrated = false;
 let databaseBootstrapPromise = Promise.resolve();
 let databaseWriteQueue = Promise.resolve();
@@ -480,8 +535,150 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function normalizeUsername(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getLoginLabel(target) {
+  return loginTargetLabels[target] || "Admin";
+}
+
+function requiresLogin(target) {
+  return Object.prototype.hasOwnProperty.call(protectedLoginTargets, target);
+}
+
+function isUserAuthorizedForTarget(user, target) {
+  if (!requiresLogin(target)) return true;
+  return Boolean(user && protectedLoginTargets[target].includes(user.roleId));
+}
+
+function updateHash(hash, options = {}) {
+  if (options.replace) {
+    history.replaceState(null, "", hash || location.pathname);
+    syncRoute();
+    return;
+  }
+  location.hash = hash;
+}
+
+function openLoginForTarget(target, options = {}) {
+  state.loginTarget = target;
+  state.loginError = "";
+  if (elements.loginForm) {
+    elements.loginForm.reset();
+  }
+  updateHash(`#login-${target}`, options);
+}
+
+function getDbRoleForSettingsRole(roleId) {
+  return roleId === "kitchen-supervisor" ? "kitchen_supervisor" : roleId;
+}
+
+function getSettingsRoleForDbRole(role) {
+  if (role === "kitchen_supervisor" || role === "sous_chef") return "kitchen-supervisor";
+  return role;
+}
+
+function getAllAdminMembers() {
+  return Object.entries(adminMembersByRole).flatMap(([roleId, members]) =>
+    members.map((member) => ({ ...member, roleId })),
+  );
+}
+
+function findMemberForLogin(target, username, password) {
+  const normalizedUsername = normalizeUsername(username);
+  const allowedRoleIds = protectedLoginTargets[target] || [];
+
+  return getAllAdminMembers().find(
+    (member) =>
+      allowedRoleIds.includes(member.roleId) &&
+      normalizeUsername(member.username) === normalizedUsername &&
+      String(member.password) === String(password) &&
+      member.isActive !== false,
+  );
+}
+
+function resetAdminMembers() {
+  for (const role of adminSettingsRoles) {
+    adminMembersByRole[role.id] = [];
+  }
+}
+
+function ensureDefaultAdminMember() {
+  const adminMembers = adminMembersByRole.admin || [];
+  if (!adminMembers.some((member) => normalizeUsername(member.username) === "admin")) {
+    adminMembers.unshift({ name: "Admin", username: "admin", password: "12345", id: null });
+  }
+  adminMembersByRole.admin = adminMembers;
+}
+
+function getAttendanceRecord(username) {
+  const key = normalizeUsername(username);
+  if (!adminAttendanceByUsername.has(key)) {
+    adminAttendanceByUsername.set(key, {
+      status: "",
+      checkIn: "--",
+      checkOut: "--",
+    });
+  }
+  return adminAttendanceByUsername.get(key);
+}
+
+function getAdminAttendanceRows() {
+  return attendanceRoleIds.flatMap((roleId) =>
+    (adminMembersByRole[roleId] || [])
+      .filter((member) => member.isActive !== false)
+      .map((member) => {
+        const attendance = getAttendanceRecord(member.username);
+        return {
+          ...attendance,
+          name: member.name,
+          username: member.username,
+          roleId,
+        };
+      }),
+  );
+}
+
 function parseRoute() {
   const hash = location.hash.replace(/^#/, "");
+
+  if (hash.startsWith("login-")) {
+    const loginTarget = hash.slice(6);
+    return {
+      page: "login",
+      loginTarget: requiresLogin(loginTarget) ? loginTarget : "admin",
+    };
+  }
+
+  if (hash === "admin" || hash === "admin-dashboard") {
+    return { page: "admin", adminView: "dashboard" };
+  }
+
+  if (hash === "admin-tables") {
+    return { page: "admin", adminView: "tables" };
+  }
+
+  if (hash === "admin-attendance") {
+    return { page: "admin", adminView: "attendance" };
+  }
+
+  if (hash === "admin-tickets") {
+    return { page: "tickets" };
+  }
+
+  if (hash === "admin-settings") {
+    return { page: "admin", adminView: "settings" };
+  }
+
+  if (hash.startsWith("admin-table-")) {
+    const tableNumber = Number(hash.slice(12));
+    return {
+      page: "admin",
+      adminView: "table-detail",
+      tableNumber: Number.isFinite(tableNumber) && tableNumber > 0 ? tableNumber : 1,
+    };
+  }
 
   if (hash.startsWith("menu-")) {
     const tableNumber = Number(hash.slice(5));
@@ -534,48 +731,78 @@ function parseRoute() {
   return { page: "home" };
 }
 
-function setRoute(page, tableNumber = 1) {
+function setRoute(page, tableNumber = 1, options = {}) {
+  if (page === "admin" || page === "admin-dashboard") {
+    updateHash("#admin", options);
+    return;
+  }
+
+  if (page === "admin-tables") {
+    updateHash("#admin-tables", options);
+    return;
+  }
+
+  if (page === "admin-attendance") {
+    updateHash("#admin-attendance", options);
+    return;
+  }
+
+  if (page === "admin-tickets") {
+    updateHash("#tickets", options);
+    return;
+  }
+
+  if (page === "admin-settings") {
+    updateHash("#admin-settings", options);
+    return;
+  }
+
+  if (page === "admin-table-detail") {
+    updateHash(`#admin-table-${tableNumber}`, options);
+    return;
+  }
+
   if (page === "menu") {
-    location.hash = `#menu-${tableNumber}`;
+    updateHash(`#menu-${tableNumber}`, options);
     return;
   }
 
   if (page === "captain") {
-    location.hash = "#captain";
+    updateHash("#captain", options);
     return;
   }
 
   if (page === "cashier") {
-    location.hash = "#cashier";
+    updateHash("#cashier", options);
     return;
   }
 
   if (page === "sous-chef") {
-    location.hash = "#sous-chef";
+    updateHash("#sous-chef", options);
     return;
   }
 
   if (page === "tickets") {
-    location.hash = "#tickets";
+    updateHash("#tickets", options);
     return;
   }
 
   if (page === "bill") {
-    location.hash = `#bill-${tableNumber}`;
+    updateHash(`#bill-${tableNumber}`, options);
     return;
   }
 
   if (page === "captain-bill") {
-    location.hash = `#captain-bill-${tableNumber}`;
+    updateHash(`#captain-bill-${tableNumber}`, options);
     return;
   }
 
   if (page === "captain-delivery") {
-    location.hash = `#captain-delivery-${tableNumber}`;
+    updateHash(`#captain-delivery-${tableNumber}`, options);
     return;
   }
 
-  location.hash = "";
+  updateHash("", options);
 }
 
 function cloneOrderItems(orderItems) {
@@ -588,6 +815,15 @@ function isPublishedOrderItem(item) {
 
 function isSharedOrder(orderItems) {
   return orderItems.length > 0 && orderItems.every((item) => isPublishedOrderItem(item));
+}
+
+function isPaymentPendingOrder(orderItems) {
+  return (
+    orderItems.length > 0 &&
+    orderItems.every(
+      (item) => item.acceptance === "delivered" && Number.isFinite(item.captainDeliveredAt),
+    )
+  );
 }
 
 function getCaptainDraftStartedAt(tableNumber) {
@@ -656,7 +892,9 @@ function getCaptainTableVisualState(tableNumber) {
     };
   }
 
-  const unsettledItems = orderItems.filter((item) => !Number.isFinite(item.captainDeliveredAt));
+  const unsettledItems = orderItems.filter(
+    (item) => item.acceptance !== "delivered" || !Number.isFinite(item.captainDeliveredAt),
+  );
   if (!unsettledItems.length) {
     return {
       state: "captain-delivered",
@@ -784,26 +1022,36 @@ async function supabaseRequest(path, { method = "GET", query = {}, body, prefer 
 }
 
 function mapDbOrderItem(row) {
+  const acceptance =
+    row.acceptance_status === "pending"
+      ? null
+      : row.acceptance_status === "accepted"
+        ? "out"
+        : row.acceptance_status === "out" ||
+            row.acceptance_status === "rejected" ||
+            row.acceptance_status === "delivered"
+          ? row.acceptance_status
+          : null;
+  const deliveredAt = fromSupabaseTimestamp(row.delivered_at);
+  const savedCaptainDeliveredAt = fromSupabaseTimestamp(row.captain_delivered_at);
+  const captainDeliveredAt =
+    savedCaptainDeliveredAt ??
+    (row.status === "delivered" && acceptance === "delivered" && Number.isFinite(deliveredAt)
+      ? deliveredAt
+      : null);
+
   return {
     categoryName: row.category_name,
     dishName: row.dish_name,
     quantity: Number(row.quantity) || 1,
     note: row.note || "",
-    acceptance:
-      row.acceptance_status === "pending"
-        ? null
-        : row.acceptance_status === "accepted"
-          ? "out"
-          : row.acceptance_status === "out" ||
-              row.acceptance_status === "rejected" ||
-              row.acceptance_status === "delivered"
-            ? row.acceptance_status
-            : null,
+    acceptance,
     receivedAt: fromSupabaseTimestamp(row.received_at) ?? Date.now(),
     sharedAt: fromSupabaseTimestamp(row.shared_at),
     outAt: fromSupabaseTimestamp(row.out_at),
     rejectedAt: fromSupabaseTimestamp(row.rejected_at),
-    deliveredAt: fromSupabaseTimestamp(row.delivered_at),
+    deliveredAt,
+    captainDeliveredAt,
   };
 }
 
@@ -813,6 +1061,7 @@ function mapOrderItemForDb(item, sortOrder) {
     dish_name: item.dishName,
     quantity: Number(item.quantity) || 1,
     note: item.note || "",
+    status: Number.isFinite(item.captainDeliveredAt) ? "delivered" : "pending",
     acceptance_status:
       item.acceptance === "out" || item.acceptance === "delivered" || item.acceptance === "rejected"
         ? item.acceptance
@@ -839,16 +1088,100 @@ function enqueueDatabaseWrite(task) {
   return databaseWriteQueue;
 }
 
+async function hydrateUsersFromDatabase() {
+  const rows = await supabaseRequest("users", {
+    query: {
+      select: "id,full_name,role,username,password,is_active",
+      is_active: "eq.true",
+      order: "full_name.asc",
+    },
+  });
+
+  if (!Array.isArray(rows)) return;
+
+  resetAdminMembers();
+  for (const row of rows) {
+    const roleId = getSettingsRoleForDbRole(row.role);
+    if (!adminMembersByRole[roleId]) continue;
+
+    adminMembersByRole[roleId].push({
+      id: row.id ?? null,
+      name: row.full_name || "",
+      username: row.username || "",
+      password: row.password || "",
+      isActive: row.is_active !== false,
+    });
+  }
+  ensureDefaultAdminMember();
+}
+
+function persistAdminMemberToDatabase(member, roleId) {
+  enqueueDatabaseWrite(async () => {
+    const insertedRows = await supabaseRequest("users", {
+      method: "POST",
+      query: {
+        select: "id",
+        on_conflict: "username",
+      },
+      prefer: "return=representation,resolution=merge-duplicates",
+      body: {
+        full_name: member.name,
+        role: getDbRoleForSettingsRole(roleId),
+        username: member.username,
+        password: member.password,
+        is_active: true,
+      },
+    });
+
+    const insertedId = insertedRows?.[0]?.id;
+    if (insertedId !== undefined && insertedId !== null) {
+      member.id = insertedId;
+    }
+  });
+}
+
+function deleteAdminMemberFromDatabase(member) {
+  enqueueDatabaseWrite(async () => {
+    if (member.id) {
+      await supabaseRequest("users", {
+        method: "PATCH",
+        query: {
+          id: `eq.${member.id}`,
+        },
+        prefer: "return=minimal",
+        body: {
+          is_active: false,
+        },
+      });
+      return;
+    }
+
+    await supabaseRequest("users", {
+      method: "PATCH",
+      query: {
+        username: `eq.${member.username}`,
+      },
+      prefer: "return=minimal",
+      body: {
+        is_active: false,
+      },
+    });
+  });
+}
+
 async function hydrateOrdersFromDatabase() {
   const rows = await supabaseRequest("orders", {
     query: {
-      select: "table_number,table_id,shared_at,order_items(*)",
+      select: "table_number,table_id,status,shared_at,order_items(*)",
+      status: "not.in.(closed,cancelled)",
       order: "table_number.asc",
     },
   });
 
   const tableOrders = new Map();
   for (const row of rows || []) {
+    if (row.status === "closed" || row.status === "cancelled") continue;
+
     const tableNumber = Number(
       row.table_number ?? state.diningTableNumbersById.get(Number(row.table_id)) ?? row.table_id,
     );
@@ -941,6 +1274,7 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
     query: {
       select: "id,table_number,table_id",
       table_number: `eq.${tableNumber}`,
+      status: "not.in.(closed,cancelled)",
       limit: "1",
     },
   });
@@ -973,7 +1307,11 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
   const orderSharedAt = isSharedOrder(orderItems)
     ? Math.min(...orderItems.map((item) => Number(item.sharedAt)).filter((value) => Number.isFinite(value)))
     : null;
-  const orderStatus = isSharedOrder(orderItems) ? "shared" : "open";
+  const orderStatus = isPaymentPendingOrder(orderItems)
+    ? "payment_pending"
+    : isSharedOrder(orderItems)
+      ? "shared"
+      : "open";
 
   let orderId = existingOrderId;
   if (orderId) {
@@ -1013,6 +1351,7 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
       query: {
         select: "id,table_number,table_id",
         table_number: `eq.${tableNumber}`,
+        status: "not.in.(closed,cancelled)",
         limit: "1",
       },
     });
@@ -1040,6 +1379,33 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
       body: payload,
     });
   }
+}
+
+async function closeOrderInDatabase(tableNumber) {
+  if (!Number.isFinite(tableNumber)) return;
+
+  const existingOrderRows = await supabaseRequest("orders", {
+    query: {
+      select: "id,table_number,table_id",
+      table_number: `eq.${tableNumber}`,
+      status: "not.in.(closed,cancelled)",
+      limit: "1",
+    },
+  });
+  const existingOrderId = existingOrderRows?.[0]?.id || null;
+  if (!existingOrderId) return;
+
+  await supabaseRequest("orders", {
+    method: "PATCH",
+    query: {
+      id: `eq.${existingOrderId}`,
+    },
+    prefer: "return=minimal",
+    body: {
+      status: "closed",
+      closed_at: new Date().toISOString(),
+    },
+  });
 }
 
 function isOrderRoute(pageName) {
@@ -1091,6 +1457,18 @@ function loadOrderForTable(tableNumber) {
 function showPage(pageName) {
   for (const [name, page] of pages.entries()) {
     page.hidden = name !== pageName;
+  }
+}
+
+function renderLogin() {
+  const loginTarget = state.loginTarget || "admin";
+
+  if (elements.loginTitle) {
+    elements.loginTitle.textContent = `${getLoginLabel(loginTarget)} Log-in`;
+  }
+
+  if (elements.loginError) {
+    elements.loginError.textContent = state.loginError;
   }
 }
 
@@ -1170,6 +1548,9 @@ function confirmDishPopup() {
     outAt: Number.isFinite(existingOrderItem?.outAt) ? existingOrderItem.outAt : null,
     rejectedAt: Number.isFinite(existingOrderItem?.rejectedAt) ? existingOrderItem.rejectedAt : null,
     deliveredAt: Number.isFinite(existingOrderItem?.deliveredAt) ? existingOrderItem.deliveredAt : null,
+    captainDeliveredAt: Number.isFinite(existingOrderItem?.captainDeliveredAt)
+      ? existingOrderItem.captainDeliveredAt
+      : null,
   };
 
   if (
@@ -1373,7 +1754,7 @@ function syncPaymentCloseModal() {
 }
 
 function openPaymentClosePopup() {
-  if (!state.order.length) return;
+  if (!isPaymentPendingOrder(state.order)) return;
 
   resetPaymentCloseForm();
   state.paymentCloseOpen = true;
@@ -1393,6 +1774,7 @@ function closePaymentClosePopup() {
 
 function completePaymentClose() {
   if (!state.order.length || !state.paymentMethod || !state.paymentReceiptFileName) return;
+  if (!isPaymentPendingOrder(state.order)) return;
 
   const tableNumber = state.tableNumber;
   state.tableOrders.set(tableNumber, []);
@@ -1407,7 +1789,7 @@ function completePaymentClose() {
   state.captainDeliveryPopupPosition = null;
   resetPaymentCloseForm();
 
-  enqueueDatabaseWrite(() => persistOrderToDatabase(tableNumber, []));
+  enqueueDatabaseWrite(() => closeOrderInDatabase(tableNumber));
   renderMenu();
   renderCaptain();
   renderSousChef();
@@ -1466,8 +1848,15 @@ function buildRefreshIconMarkup() {
   `;
 }
 
-function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex) {
+function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex, readOnly = false) {
   if (item.acceptance === "out") {
+    if (readOnly) {
+      return `
+        <div class="ticket-card__status bill-item__status bill-item__status--out" aria-hidden="true">
+          Out
+        </div>`;
+    }
+
     return `
       <button
         class="ticket-card__status bill-item__status bill-item__status--out"
@@ -1486,6 +1875,13 @@ function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex) {
   }
 
   if (item.acceptance === "rejected") {
+    if (readOnly) {
+      return `
+        <div class="ticket-card__status bill-item__status bill-item__status--rejected" aria-hidden="true">
+          ${buildRefreshIconMarkup()}
+        </div>`;
+    }
+
     return `
       <button
         class="ticket-card__status bill-item__status bill-item__status--rejected"
@@ -1494,6 +1890,13 @@ function buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex) {
         data-ticket-table="${escapeHtml(String(rowTableNumber))}"
         aria-label="Reset ${escapeHtml(item.dishName)}"
       >${buildRefreshIconMarkup()}</button>`;
+  }
+
+  if (readOnly) {
+    return `
+      <div class="ticket-card__status bill-item__status ticket-card__status--pending" aria-hidden="true">
+        New
+      </div>`;
   }
 
   return `
@@ -1585,6 +1988,10 @@ function getLiveCategoryNames(activeTickets) {
   return liveCategoryNames;
 }
 
+function isAdminTicketReadOnly() {
+  return state.ticketsBackRoute === "admin" || state.currentUser?.roleId === "admin";
+}
+
 function getCategoryTicketData(activeTickets, categoryName) {
   const normalizedCategoryName = normalizeTicketCategoryName(categoryName);
   if (!normalizedCategoryName) return null;
@@ -1642,6 +2049,7 @@ function normalizeTicketCategoryName(value) {
 
 function buildTicketCardMarkup(ticketData, selectedCategory) {
   const selectedCategoryKey = normalizeTicketCategoryName(selectedCategory);
+  const readOnly = isAdminTicketReadOnly();
   const categoryEntries = ticketData.items
     .map((item, originalIndex) => ({ item, originalIndex }))
     .filter(({ item }) => {
@@ -1696,7 +2104,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
                     <span class="ticket-card__dish">${escapeHtml(item.dishName)}</span>
                   </div>
                   <div class="ticket-card__qty">${escapeHtml(String(item.quantity))}</div>
-                  ${buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex)}
+                  ${buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex, readOnly)}
                   <div class="ticket-card__time" data-ticket-time>
                     ${escapeHtml(getOrderItemElapsedTime(item, rowReceivedAt))}
                   </div>
@@ -1716,6 +2124,8 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
 }
 
 function buildTicketOverviewCardMarkup(ticketData) {
+  const readOnly = isAdminTicketReadOnly();
+
   return `
     <article class="ticket-card ticket-card--overview" data-ticket-table="${escapeHtml(String(ticketData.tableNumber))}">
       <div class="ticket-card__header ${ticketData.isNew ? "ticket-card__header--new" : "ticket-card__header--live"}">
@@ -1725,7 +2135,7 @@ function buildTicketOverviewCardMarkup(ticketData) {
       <div class="ticket-card__columns ticket-card__columns--overview">
         <div class="ticket-card__column ticket-card__column--name">Items</div>
         <div class="ticket-card__column ticket-card__column--qty">Qty</div>
-        <div class="ticket-card__column ticket-card__column--edit">Edit</div>
+        <div class="ticket-card__column ticket-card__column--edit">${readOnly ? "Status" : "Edit"}</div>
       </div>
       <div class="ticket-card__list ticket-card__list--overview">
         ${ticketData.items
@@ -1742,10 +2152,10 @@ function buildTicketOverviewCardMarkup(ticketData) {
 
             return `
               <div class="order-item ticket-card__item ticket-card__item--overview ${itemClassName}" data-ticket-table="${escapeHtml(String(ticketData.tableNumber))}" data-ticket-item-index="${escapeHtml(String(rowIndex))}">
-                <div class="order-item__main ticket-card__main--overview">
-                  <div class="order-item__name">${escapeHtml(`${index + 1}. ${item.dishName}`)}</div>
-                  <div class="order-item__qty">${escapeHtml(String(item.quantity))}</div>
-                  ${buildTicketOverviewActionMarkup(item, ticketData.tableNumber, rowIndex)}
+                <div class="ticket-card__main ticket-card__main--overview">
+                  <div class="ticket-card__name ticket-card__name--overview">${escapeHtml(`${index + 1}. ${item.dishName}`)}</div>
+                  <div class="ticket-card__qty ticket-card__qty--overview">${escapeHtml(String(item.quantity))}</div>
+                  ${buildTicketOverviewActionMarkup(item, ticketData.tableNumber, rowIndex, readOnly)}
                 </div>
                 ${
                   item.note
@@ -1761,8 +2171,12 @@ function buildTicketOverviewCardMarkup(ticketData) {
     </article>`;
 }
 
-function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex) {
+function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex, readOnly = false) {
   if (item.acceptance === "out") {
+    if (readOnly) {
+      return '<div class="ticket-card__status ticket-card__status--out" aria-hidden="true">Out</div>';
+    }
+
     return `
       <button
         class="ticket-card__status ticket-card__status--out"
@@ -1781,6 +2195,13 @@ function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex) {
   }
 
   if (item.acceptance === "rejected") {
+    if (readOnly) {
+      return `
+        <div class="ticket-card__status ticket-card__status--rejected" aria-hidden="true">
+          ${buildRefreshIconMarkup()}
+        </div>`;
+    }
+
     return `
       <button
         class="ticket-card__status ticket-card__status--rejected"
@@ -1791,6 +2212,10 @@ function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex) {
       >${buildRefreshIconMarkup()}</button>`;
   }
 
+  if (readOnly) {
+    return '<div class="ticket-card__status ticket-card__status--pending" aria-hidden="true">New</div>';
+  }
+
   return `
     <button
       class="order-item__edit"
@@ -1799,6 +2224,580 @@ function buildTicketOverviewActionMarkup(item, tableNumber, rowIndex) {
       data-ticket-table="${escapeHtml(String(tableNumber))}"
       aria-label="Edit ${escapeHtml(item.dishName)}"
     >${buildEditIconMarkup()}</button>`;
+}
+
+function formatAdminDate(date) {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value || "";
+  const month = parts.find((part) => part.type === "month")?.value || "";
+  const year = parts.find((part) => part.type === "year")?.value || "";
+  return `${day} ${month}, ${year}`.trim();
+}
+
+function formatAdminDateForInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatAdminTimeForInput(value) {
+  const timeValue = String(value || "").trim();
+  const twentyFourHourMatch = timeValue.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (twentyFourHourMatch) {
+    const hours = Number(twentyFourHourMatch[1]);
+    const minutes = Number(twentyFourHourMatch[2]);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+  }
+
+  const twelveHourMatch = timeValue.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!twelveHourMatch) return "";
+
+  let hours = Number(twelveHourMatch[1]);
+  const minutes = Number(twelveHourMatch[2]);
+  const meridiem = twelveHourMatch[3].toUpperCase();
+
+  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return "";
+  if (meridiem === "AM") {
+    hours = hours === 12 ? 0 : hours;
+  } else {
+    hours = hours === 12 ? 12 : hours + 12;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function formatAdminTimeForDisplay(value) {
+  const inputValue = formatAdminTimeForInput(value);
+  if (!inputValue) return "";
+
+  const [hourText, minuteText] = inputValue.split(":");
+  const hours = Number(hourText);
+  const displayHour = hours % 12 || 12;
+  const meridiem = hours >= 12 ? "PM" : "AM";
+  return `${displayHour}:${minuteText} ${meridiem}`;
+}
+
+function formatCurrentAdminTime() {
+  const now = new Date();
+  return formatAdminTimeForDisplay(
+    `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+  );
+}
+
+function openNativePicker(inputElement) {
+  if (!inputElement) return;
+
+  inputElement.focus({ preventScroll: true });
+  if (typeof inputElement.showPicker === "function") {
+    try {
+      inputElement.showPicker();
+      return;
+    } catch (error) {
+      inputElement.click();
+      return;
+    }
+  }
+
+  inputElement.click();
+}
+
+function getAdminTitle() {
+  return state.adminView === "table-detail" ? "Admin (Ticket Status)" : "Admin";
+}
+
+function buildAdminSidebarMarkup() {
+  if (state.adminView === "table-detail") {
+    const selectedTicket = getTicketDataForOrder(
+      state.tableNumber,
+      state.tableOrders.get(state.tableNumber) || [],
+    );
+    const categoryNames = selectedTicket
+      ? selectedTicket.categories.filter((categoryName) =>
+          selectedTicket.items.some(
+            (item) => item.categoryName === categoryName && item.acceptance !== "delivered",
+          ),
+        )
+      : [];
+
+    return `
+      <div class="admin-sidebar__group">
+        <button class="admin-sidebar__row" type="button" data-admin-route="admin-tables">
+          <span class="admin-sidebar__label">Tables</span>
+        </button>
+        <div class="admin-sidebar__row admin-sidebar__row--selected" aria-current="page">
+          <span class="admin-sidebar__icon" aria-hidden="true">‹</span>
+          <span class="admin-sidebar__label">Tickets (${selectedTicket ? 1 : 0})</span>
+        </div>
+        <div class="admin-sidebar__heading">Live Category Wise</div>
+        ${
+          categoryNames.length
+            ? categoryNames
+                .map(
+                  (categoryName) => `
+                    <div class="admin-sidebar__row">
+                      <span class="admin-sidebar__label">${escapeHtml(categoryName)}</span>
+                    </div>`,
+                )
+                .join("")
+            : '<div class="admin-sidebar__empty">NA</div>'
+        }
+      </div>`;
+  }
+
+  if (state.adminView === "settings") {
+    return `
+      <div class="admin-sidebar__group">
+        ${adminSidebarItems
+          .map((item) => {
+            const isSelected = item.view === state.adminView;
+            return `
+              <button
+                class="admin-sidebar__row${isSelected ? " admin-sidebar__row--selected" : ""}"
+                type="button"
+                data-admin-route="${escapeHtml(item.route)}"
+                aria-current="${isSelected ? "page" : "false"}"
+              >
+                ${isSelected ? '<span class="admin-sidebar__icon" aria-hidden="true">‹</span>' : ""}
+                <span class="admin-sidebar__label">${escapeHtml(item.label)}</span>
+              </button>`;
+          })
+          .join("")}
+      </div>
+      <button class="admin-sidebar__logout" type="button" data-admin-logout>
+        <img class="admin-sidebar__logout-icon" src="./Logout.png" alt="" aria-hidden="true">
+        <span>Log Out</span>
+      </button>`;
+  }
+
+  return adminSidebarItems
+    .map((item) => {
+      const isSelected = item.view === state.adminView;
+      return `
+        <button
+          class="admin-sidebar__row${isSelected ? " admin-sidebar__row--selected" : ""}"
+          type="button"
+          data-admin-route="${escapeHtml(item.route)}"
+          aria-current="${isSelected ? "page" : "false"}"
+        >
+          ${isSelected ? '<span class="admin-sidebar__icon" aria-hidden="true">‹</span>' : ""}
+          <span class="admin-sidebar__label">${escapeHtml(item.label)}</span>
+        </button>`;
+    })
+    .join("");
+}
+
+function buildAdminDashboardMarkup() {
+  return `
+    <ul class="admin-dashboard">
+      <li>Sales Summary</li>
+      <li>Active Orders</li>
+      <li>Revenue Statistics</li>
+      <li>Quick Insights</li>
+    </ul>`;
+}
+
+function buildAdminTableGridMarkup() {
+  return `
+    <div class="table-grid admin-table-grid">
+      ${Array.from({ length: 20 }, (_, index) => {
+        const tableNumber = index + 1;
+        return `
+          <button
+            class="table-tile"
+            type="button"
+            data-admin-table="${tableNumber}"
+          >${tableNumber}</button>`;
+      }).join("")}
+    </div>`;
+}
+
+function buildAdminAttendanceMarkup() {
+  const dateInputValue = formatAdminDateForInput(state.adminDate);
+  const attendanceRows = getAdminAttendanceRows();
+
+  return `
+    <div class="admin-attendance">
+      <div class="admin-attendance__date" data-admin-date-picker>
+        <button class="admin-date-nav" type="button" data-admin-date-shift="-1" aria-label="Previous day">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <div class="admin-attendance__date-current">
+          <span class="admin-attendance__calendar" aria-hidden="true">
+            <span class="admin-attendance__calendar-line"></span>
+          </span>
+          <span>${escapeHtml(formatAdminDate(state.adminDate))}</span>
+        </div>
+        <input
+          class="admin-attendance__picker-input"
+          type="date"
+          value="${escapeHtml(dateInputValue)}"
+          data-admin-date-input
+          aria-label="Choose attendance date"
+        >
+        <button class="admin-date-nav" type="button" data-admin-date-shift="1" aria-label="Next day">
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
+
+      <div class="admin-attendance__head">
+        <div class="admin-attendance__name">Name</div>
+        <div class="admin-attendance__metrics">
+          <div class="admin-attendance__status">Attendance</div>
+          <div class="admin-attendance__time">Check In</div>
+          <div class="admin-attendance__time">Check Out</div>
+        </div>
+      </div>
+
+      ${
+        attendanceRows.length
+          ? attendanceRows
+              .map((row, index) => {
+            const isPresent = row.status === "present";
+            const isAbsent = row.status === "absent";
+            const isDropdownOpen = state.adminAttendanceDropdownIndex === index;
+            const triggerStatusClass = isPresent
+              ? " admin-attendance__status-trigger--present"
+              : isAbsent
+                ? " admin-attendance__status-trigger--absent"
+                : "";
+            const statusSymbol = isPresent ? "✓" : isAbsent ? "×" : "";
+            const checkInInputValue = formatAdminTimeForInput(row.checkIn);
+            const checkOutInputValue = formatAdminTimeForInput(row.checkOut);
+
+            return `
+            <div class="admin-attendance__row${isDropdownOpen ? " admin-attendance__row--status-open" : ""}">
+              <div class="admin-attendance__name">${escapeHtml(row.name)}</div>
+              <div class="admin-attendance__metrics">
+                <div class="admin-attendance__status">
+                  <div class="admin-attendance__status-dropdown" data-admin-attendance-dropdown>
+                    <button
+                      class="admin-attendance__status-trigger${triggerStatusClass}${isDropdownOpen ? " admin-attendance__status-trigger--open" : ""}"
+                      type="button"
+                      data-admin-attendance-toggle="${index}"
+                      aria-label="Choose ${escapeHtml(row.name)} attendance"
+                      aria-expanded="${isDropdownOpen ? "true" : "false"}"
+                    >
+                      <span class="admin-attendance__status-value">${statusSymbol}</span>
+                      <span class="admin-attendance__status-chevron" aria-hidden="true"></span>
+                    </button>
+                    ${
+                      isDropdownOpen
+                        ? `
+                    <div class="admin-attendance__status-menu" role="menu">
+                    <button
+                      class="admin-attendance__status-option admin-attendance__status-option--present"
+                      type="button"
+                      data-admin-attendance-status="${index}"
+                      data-admin-status="present"
+                      aria-label="Mark ${escapeHtml(row.name)} present"
+                      role="menuitem"
+                    >✓</button>
+                    <button
+                      class="admin-attendance__status-option admin-attendance__status-option--absent"
+                      type="button"
+                      data-admin-attendance-status="${index}"
+                      data-admin-status="absent"
+                      aria-label="Mark ${escapeHtml(row.name)} absent"
+                      role="menuitem"
+                    >×</button>
+                    </div>`
+                        : ""
+                    }
+                  </div>
+                </div>
+                <div class="admin-attendance__time">
+                  <button
+                    class="admin-attendance__time-button"
+                    type="button"
+                    data-admin-attendance-time-open="${index}:checkIn"
+                  >${escapeHtml(row.checkIn)}</button>
+                  <input
+                    class="admin-attendance__picker-input"
+                    type="time"
+                    value="${escapeHtml(checkInInputValue)}"
+                    data-admin-attendance-time-input="${index}:checkIn"
+                    aria-label="${escapeHtml(row.name)} check in time"
+                  >
+                </div>
+                <div class="admin-attendance__time">
+                  <button
+                    class="admin-attendance__time-button"
+                    type="button"
+                    data-admin-attendance-time-open="${index}:checkOut"
+                  >${escapeHtml(row.checkOut)}</button>
+                  <input
+                    class="admin-attendance__picker-input"
+                    type="time"
+                    value="${escapeHtml(checkOutInputValue)}"
+                    data-admin-attendance-time-input="${index}:checkOut"
+                    aria-label="${escapeHtml(row.name)} check out time"
+                  >
+                </div>
+              </div>
+            </div>`;
+              })
+              .join("")
+          : '<div class="admin-attendance__row"><div class="admin-attendance__name">NA</div><div class="admin-attendance__metrics"><div class="admin-attendance__status"></div><div class="admin-attendance__time">--</div><div class="admin-attendance__time">--</div></div></div>'
+      }
+    </div>`;
+}
+
+function getSelectedAdminSettingsRole() {
+  return (
+    adminSettingsRoles.find((role) => role.id === state.adminSettingsRole) ||
+    adminSettingsRoles[0]
+  );
+}
+
+function buildAdminSettingsTabsMarkup() {
+  return adminSettingsRoles
+    .map((role) => {
+      const isSelected = role.id === state.adminSettingsRole;
+      return `
+        <button
+          class="admin-settings__role${isSelected ? " admin-settings__role--selected" : ""}"
+          type="button"
+          data-admin-settings-role="${escapeHtml(role.id)}"
+          aria-pressed="${isSelected ? "true" : "false"}"
+        >${escapeHtml(role.label)}</button>`;
+    })
+    .join("");
+}
+
+function buildAdminSettingsMembersMarkup() {
+  const members = adminMembersByRole[state.adminSettingsRole] || [];
+
+  if (!members.length) {
+    return '<div class="admin-settings__empty-row">NA</div>';
+  }
+
+  return members
+    .map(
+      (member, index) => `
+        <div class="admin-settings__member-row">
+          <div class="admin-settings__cell admin-settings__cell--name">${escapeHtml(member.name)}</div>
+          <div class="admin-settings__cell admin-settings__cell--username">${escapeHtml(member.username)}</div>
+          <div class="admin-settings__cell admin-settings__cell--password">${"*".repeat(
+            Math.max(5, String(member.password || "").length),
+          )}</div>
+          <button
+            class="admin-settings__delete"
+            type="button"
+            data-admin-member-delete="${index}"
+            aria-label="Delete ${escapeHtml(member.name)}"
+          >
+            <span class="admin-settings__trash" aria-hidden="true"></span>
+          </button>
+        </div>`,
+    )
+    .join("");
+}
+
+function buildAdminAddMemberModalMarkup() {
+  const selectedRole = getSelectedAdminSettingsRole();
+
+  return `
+    <form class="admin-member-modal" data-admin-member-form aria-label="${escapeHtml(
+      selectedRole.addLabel,
+    )}">
+      <div class="admin-member-modal__header">
+        <h2>${escapeHtml(selectedRole.addLabel)}</h2>
+        <button class="admin-member-modal__close" type="button" data-admin-add-member-close aria-label="Close add member">
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <label class="admin-member-modal__field">
+        <span>Name</span>
+        <input
+          class="admin-member-modal__input"
+          type="text"
+          name="name"
+          placeholder="Enter Name"
+          autocomplete="off"
+          required
+        >
+      </label>
+
+      <label class="admin-member-modal__field">
+        <span>Username (Max 10 Char)</span>
+        <input
+          class="admin-member-modal__input"
+          type="text"
+          name="username"
+          placeholder="Enter Username"
+          autocomplete="off"
+          maxlength="10"
+          required
+        >
+      </label>
+
+      <label class="admin-member-modal__field">
+        <span>Password (5 Char)</span>
+        <input
+          class="admin-member-modal__input"
+          type="password"
+          name="password"
+          placeholder="Enter Password"
+          autocomplete="new-password"
+          maxlength="5"
+          minlength="5"
+          required
+        >
+      </label>
+
+      <button class="admin-member-modal__submit" type="submit">Add</button>
+    </form>`;
+}
+
+function buildAdminSettingsMarkup() {
+  return `
+    <section class="admin-settings">
+      <div class="admin-settings__content${state.adminAddMemberOpen ? " admin-settings__content--blurred" : ""}">
+        <div class="admin-settings__roles" role="tablist" aria-label="Member roles">
+          ${buildAdminSettingsTabsMarkup()}
+        </div>
+
+        <div class="admin-settings__add-row">
+          <button class="admin-settings__add" type="button" data-admin-add-member-open>
+            Add Member +
+          </button>
+        </div>
+
+        <div class="admin-settings__header">
+          <div class="admin-settings__cell admin-settings__cell--name">Name</div>
+          <div class="admin-settings__cell admin-settings__cell--username">Username</div>
+          <div class="admin-settings__cell admin-settings__cell--password">Password</div>
+          <div class="admin-settings__delete-spacer" aria-hidden="true"></div>
+        </div>
+
+        <div class="admin-settings__members">
+          ${buildAdminSettingsMembersMarkup()}
+        </div>
+      </div>
+
+      ${state.adminAddMemberOpen ? buildAdminAddMemberModalMarkup() : ""}
+    </section>`;
+}
+
+function buildAdminTicketDetailMarkup() {
+  const ticketData = getTicketDataForOrder(
+    state.tableNumber,
+    state.tableOrders.get(state.tableNumber) || [],
+  );
+
+  if (!ticketData) {
+    return `
+      <article class="admin-ticket-card">
+        <div class="admin-ticket-card__header">
+          <span>Table ${escapeHtml(String(state.tableNumber))}</span>
+          <span>00:00:00</span>
+        </div>
+        <div class="admin-ticket-card__empty">NA</div>
+      </article>`;
+  }
+
+  return `
+    <article class="admin-ticket-card" data-admin-ticket-table="${escapeHtml(String(ticketData.tableNumber))}">
+      <div class="admin-ticket-card__header${ticketData.isNew ? "" : " admin-ticket-card__header--live"}">
+        <span>Table ${escapeHtml(String(ticketData.tableNumber))}</span>
+        <span data-admin-ticket-time>${escapeHtml(formatElapsedTime(Date.now() - ticketData.receivedAt))}</span>
+      </div>
+      <div class="admin-ticket-card__columns" aria-hidden="true">
+        <div>Items</div>
+        <div class="admin-ticket-card__column--qty">Qty</div>
+      </div>
+      <div class="admin-ticket-card__list">
+        ${ticketData.items
+          .map((item, index) => {
+            const isSelected = index === 0;
+            return `
+              <div class="admin-ticket-card__item${isSelected ? " admin-ticket-card__item--selected" : ""}">
+                <div class="admin-ticket-card__item-main">
+                  <div>${escapeHtml(`${index + 1}. ${item.dishName}`)}</div>
+                  <div class="admin-ticket-card__qty">${escapeHtml(String(item.quantity))}</div>
+                </div>
+                ${
+                  item.note
+                    ? `<div class="admin-ticket-card__note-row">
+                        <div class="admin-ticket-card__note">${escapeHtml(item.note)}</div>
+                      </div>`
+                    : ""
+                }
+              </div>`;
+          })
+          .join("")}
+      </div>
+    </article>`;
+}
+
+function syncAdminTableColors() {
+  if (!elements.adminMain) return;
+
+  elements.adminMain.querySelectorAll("[data-admin-table]").forEach((button) => {
+    const tableNumber = Number(button.dataset.adminTable);
+    if (!Number.isFinite(tableNumber)) return;
+    const tableVisualState = getCaptainTableVisualState(tableNumber);
+    applyTableVisualState(button, tableVisualState.state, tableNumber, {
+      hasReadyDot: tableVisualState.hasReadyDot,
+    });
+  });
+}
+
+function updateAdminTicketTimers() {
+  if (!elements.adminMain || state.page !== "admin" || state.adminView !== "table-detail") {
+    return;
+  }
+
+  const timeElement = elements.adminMain.querySelector("[data-admin-ticket-time]");
+  if (!timeElement) return;
+
+  const ticketData = getTicketDataForOrder(
+    state.tableNumber,
+    state.tableOrders.get(state.tableNumber) || [],
+  );
+  if (!ticketData) return;
+
+  timeElement.textContent = formatElapsedTime(Date.now() - ticketData.receivedAt);
+}
+
+function renderAdmin() {
+  if (!elements.adminMain || !elements.adminSidebar) return;
+
+  if (elements.adminTitle) {
+    elements.adminTitle.textContent = getAdminTitle();
+  }
+
+  if (state.adminView !== "settings") {
+    state.adminAddMemberOpen = false;
+  }
+
+  elements.adminSidebar.classList.toggle("admin-sidebar--settings", state.adminView === "settings");
+  elements.adminSidebar.innerHTML = buildAdminSidebarMarkup();
+
+  if (state.adminView === "dashboard") {
+    elements.adminMain.innerHTML = buildAdminDashboardMarkup();
+  } else if (state.adminView === "tables" || state.adminView === "tickets") {
+    elements.adminMain.innerHTML = buildAdminTableGridMarkup();
+    syncAdminTableColors();
+  } else if (state.adminView === "attendance") {
+    elements.adminMain.innerHTML = buildAdminAttendanceMarkup();
+  } else if (state.adminView === "table-detail") {
+    elements.adminMain.innerHTML = buildAdminTicketDetailMarkup();
+    updateAdminTicketTimers();
+  } else if (state.adminView === "settings") {
+    elements.adminMain.innerHTML = buildAdminSettingsMarkup();
+  } else {
+    elements.adminMain.innerHTML = '<div class="admin-main__empty">NA</div>';
+  }
 }
 
 function buildTicketsActionPopupActionsMarkup(mode) {
@@ -1859,6 +2858,7 @@ function syncTicketsActionPopup() {
   const activeItem = orderItems && hasIndex ? orderItems[state.ticketsActionIndex] : null;
   const shouldShow =
     Boolean(activeItem) &&
+    !isAdminTicketReadOnly() &&
     state.page === "tickets" &&
     (state.ticketsActionMode === "acceptance" || state.ticketsActionMode === "delivery");
 
@@ -1900,6 +2900,7 @@ function syncTicketsActionPopup() {
 }
 
 function openTicketsActionPopup(tableNumber, index, mode, anchorElement) {
+  if (isAdminTicketReadOnly()) return;
   if (!Number.isInteger(tableNumber) || !Number.isInteger(index)) return;
 
   const orderItems = getTicketOrderItems(tableNumber);
@@ -1958,6 +2959,10 @@ function setTicketAcceptance(tableNumber, index, acceptance) {
     orderItem.deliveredAt = null;
   }
 
+  if (acceptance !== "delivered") {
+    orderItem.captainDeliveredAt = null;
+  }
+
   state.tableOrders.set(tableNumber, orderItems);
   const snapshot = cloneOrderItems(orderItems);
   enqueueDatabaseWrite(() => persistOrderToDatabase(tableNumber, snapshot));
@@ -1972,6 +2977,7 @@ function clearTicketsActionState() {
 
 function renderKitchenStatusDependents() {
   renderCaptain();
+  renderAdmin();
   renderSousChef();
   renderTickets();
 }
@@ -1986,7 +2992,41 @@ function goToChefTableOverview() {
   setRoute("sous-chef");
 }
 
+function goToTicketsTableOverview() {
+  clearTicketsActionState();
+  state.ticketsViewMode = "overview";
+  state.ticketsSelectedCategory = null;
+  state.ticketsSidebarCollapsed = false;
+
+  if (state.ticketsBackRoute === "admin") {
+    setRoute("admin-tables", state.tableNumber);
+    return;
+  }
+
+  goToChefTableOverview();
+}
+
+function openTicketOverviewTable(ticketCard) {
+  if (isAdminTicketReadOnly()) return;
+
+  if (state.ticketsBackRoute !== "admin") {
+    goToChefTableOverview();
+    return;
+  }
+
+  const tableNumber = Number(ticketCard?.dataset.ticketTable);
+  if (Number.isFinite(tableNumber) && tableNumber > 0) {
+    setRoute("admin-table-detail", tableNumber);
+  }
+}
+
 function applyTicketsAcceptance(acceptance) {
+  if (isAdminTicketReadOnly()) {
+    clearTicketsActionState();
+    renderTickets();
+    return;
+  }
+
   if (!Number.isInteger(state.ticketsActionTableNumber) || !Number.isInteger(state.ticketsActionIndex)) {
     return;
   }
@@ -1997,6 +3037,12 @@ function applyTicketsAcceptance(acceptance) {
 }
 
 function confirmTicketsDelivery() {
+  if (isAdminTicketReadOnly()) {
+    clearTicketsActionState();
+    renderTickets();
+    return;
+  }
+
   if (!Number.isInteger(state.ticketsActionTableNumber) || !Number.isInteger(state.ticketsActionIndex)) {
     return;
   }
@@ -2162,7 +3208,7 @@ function renderMenu() {
   }
 
   if (elements.orderClose) {
-    elements.orderClose.hidden = state.order.length === 0;
+    elements.orderClose.hidden = !isPaymentPendingOrder(state.order);
   }
 
   if (elements.orderShare) {
@@ -2876,6 +3922,7 @@ function renderTickets() {
 
   if (elements.ticketsShell) {
     elements.ticketsShell.classList.toggle("tickets-shell--collapsed", isCollapsed);
+    elements.ticketsShell.classList.toggle("tickets-shell--readonly", isAdminTicketReadOnly());
   }
 
   if (elements.ticketsSidebar) {
@@ -2984,7 +4031,9 @@ function updateTicketTimers() {
   elements.ticketsList.querySelectorAll("[data-ticket-time]").forEach((timeElement) => {
     const ticketRow = timeElement.closest("[data-ticket-item-start]");
     const receivedAt = Number(ticketRow?.dataset.ticketItemStart);
-    const stoppedAt = Number(ticketRow?.dataset.ticketItemStop);
+    const stoppedAtValue = ticketRow?.dataset.ticketItemStop;
+    const stoppedAt =
+      stoppedAtValue === undefined || stoppedAtValue === "" ? null : Number(stoppedAtValue);
     if (!Number.isFinite(receivedAt)) return;
 
     timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
@@ -2992,6 +4041,11 @@ function updateTicketTimers() {
 }
 
 function renderActiveOrderView() {
+  if (state.page === "admin") {
+    renderAdmin();
+    return;
+  }
+
   if (state.page === "bill") {
     renderBill();
     return;
@@ -3028,12 +4082,32 @@ function syncRoute() {
   const previousTableNumber = state.tableNumber;
   const wasOrderRoute = isOrderRoute(previousPage);
   const willBeOrderRoute = isOrderRoute(route.page);
+  const protectedTarget =
+    route.page === "admin" || route.page === "captain" || route.page === "sous-chef"
+      ? route.page
+      : null;
+
+  if (protectedTarget && !isUserAuthorizedForTarget(state.currentUser, protectedTarget)) {
+    openLoginForTarget(protectedTarget, { replace: true });
+    return;
+  }
+
+  if (route.page === "login" && state.currentUser) {
+    setRoute("home", state.tableNumber, { replace: true });
+    return;
+  }
 
   if (wasOrderRoute && (previousPage !== route.page || previousTableNumber !== route.tableNumber)) {
     persistCurrentOrder();
   }
 
   state.page = route.page;
+  state.loginTarget = route.loginTarget || state.loginTarget;
+  state.adminView = route.adminView || state.adminView || "dashboard";
+
+  if (route.page === "admin" && Number.isFinite(route.tableNumber)) {
+    state.tableNumber = route.tableNumber;
+  }
 
   if (willBeOrderRoute) {
     state.tableNumber = route.tableNumber;
@@ -3078,7 +4152,9 @@ function syncRoute() {
   syncDishPopup();
   syncPaymentCloseModal();
 
-  if (route.page === "menu") {
+  if (route.page === "login") {
+    renderLogin();
+  } else if (route.page === "menu") {
     renderMenu();
   } else if (route.page === "bill") {
     renderBill();
@@ -3086,6 +4162,8 @@ function syncRoute() {
     renderCaptainBill();
   } else if (route.page === "captain-delivery") {
     renderCaptainDelivery();
+  } else if (route.page === "admin") {
+    renderAdmin();
   } else if (route.page === "tickets") {
     renderTickets();
   } else if (route.page === "sous-chef") {
@@ -3098,7 +4176,31 @@ function syncRoute() {
 for (const button of elements.navButtons) {
   button.addEventListener("click", () => {
     const target = button.dataset.nav;
+    if (target === "home") {
+      state.currentUser = null;
+      state.loginTarget = null;
+      state.loginError = "";
+      state.adminAddMemberOpen = false;
+      setRoute("home");
+      return;
+    }
+
+    if (target === "tickets-back") {
+      if (state.ticketsBackRoute === "admin") {
+        setRoute("admin", state.tableNumber);
+      } else {
+        goToChefTableOverview();
+      }
+      return;
+    }
+
+    if (requiresLogin(target) && !isUserAuthorizedForTarget(state.currentUser, target)) {
+      openLoginForTarget(target);
+      return;
+    }
+
     if (target === "tickets") {
+      state.ticketsBackRoute = state.page === "admin" ? "admin" : "sous-chef";
       state.ticketsViewMode = "overview";
       state.ticketsSelectedCategory = null;
     } else if (target === "sous-chef") {
@@ -3106,6 +4208,30 @@ for (const button of elements.navButtons) {
       return;
     }
     setRoute(target === "home" ? "home" : target, state.tableNumber);
+  });
+}
+
+if (elements.loginForm) {
+  elements.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(elements.loginForm);
+    const username = String(formData.get("username") || "");
+    const password = String(formData.get("password") || "");
+    const loginTarget = state.loginTarget || "admin";
+    const member = findMemberForLogin(loginTarget, username, password);
+
+    if (!member) {
+      state.loginError = "Invalid username or password";
+      renderLogin();
+      elements.loginPassword?.focus();
+      return;
+    }
+
+    state.currentUser = member;
+    state.loginError = "";
+    elements.loginForm.reset();
+    setRoute(loginTarget, state.tableNumber, { replace: true });
   });
 }
 
@@ -3124,6 +4250,210 @@ for (const button of elements.tableButtons) {
     setRoute(state.page === "cashier" ? "bill" : "menu", tableNumber);
   });
 }
+
+if (elements.adminSidebar) {
+  elements.adminSidebar.addEventListener("click", (event) => {
+    const logoutButton = event.target.closest("[data-admin-logout]");
+    if (logoutButton) {
+      state.currentUser = null;
+      state.loginTarget = null;
+      state.loginError = "";
+      state.adminAddMemberOpen = false;
+      setRoute("home");
+      return;
+    }
+
+    const routeButton = event.target.closest("[data-admin-route]");
+    if (!routeButton) return;
+    const targetRoute = routeButton.dataset.adminRoute;
+    state.adminAddMemberOpen = false;
+    if (targetRoute === "tickets" || targetRoute === "admin-tickets") {
+      clearTicketsActionState();
+      state.ticketsBackRoute = "admin";
+      state.ticketsViewMode = "overview";
+      state.ticketsSelectedCategory = null;
+      setRoute("tickets", state.tableNumber);
+      return;
+    }
+    setRoute(targetRoute, state.tableNumber);
+  });
+}
+
+if (elements.adminMain) {
+  elements.adminMain.addEventListener("click", (event) => {
+    const tableButton = event.target.closest("[data-admin-table]");
+    if (tableButton) {
+      const tableNumber = Number(tableButton.dataset.adminTable);
+      if (Number.isFinite(tableNumber)) {
+        setRoute("admin-table-detail", tableNumber);
+      }
+      return;
+    }
+
+    const settingsRoleButton = event.target.closest("[data-admin-settings-role]");
+    if (settingsRoleButton) {
+      const roleId = settingsRoleButton.dataset.adminSettingsRole;
+      if (!adminSettingsRoles.some((role) => role.id === roleId)) return;
+
+      state.adminSettingsRole = roleId;
+      state.adminAddMemberOpen = false;
+      renderAdmin();
+      return;
+    }
+
+    const addMemberOpenButton = event.target.closest("[data-admin-add-member-open]");
+    if (addMemberOpenButton) {
+      state.adminAddMemberOpen = true;
+      renderAdmin();
+      elements.adminMain.querySelector('input[name="name"]')?.focus();
+      return;
+    }
+
+    const addMemberCloseButton = event.target.closest("[data-admin-add-member-close]");
+    if (addMemberCloseButton) {
+      state.adminAddMemberOpen = false;
+      renderAdmin();
+      return;
+    }
+
+    const memberDeleteButton = event.target.closest("[data-admin-member-delete]");
+    if (memberDeleteButton) {
+      const memberIndex = Number(memberDeleteButton.dataset.adminMemberDelete);
+      const members = adminMembersByRole[state.adminSettingsRole] || [];
+
+      if (Number.isFinite(memberIndex) && members[memberIndex]) {
+        const [removedMember] = members.splice(memberIndex, 1);
+        if (removedMember) {
+          adminAttendanceByUsername.delete(normalizeUsername(removedMember.username));
+          deleteAdminMemberFromDatabase(removedMember);
+        }
+        renderAdmin();
+      }
+      return;
+    }
+
+    const attendanceStatusButton = event.target.closest("[data-admin-attendance-status]");
+    if (attendanceStatusButton) {
+      const rowIndex = Number(attendanceStatusButton.dataset.adminAttendanceStatus);
+      const row = getAdminAttendanceRows()[rowIndex];
+      const status = attendanceStatusButton.dataset.adminStatus;
+
+      if (!row || (status !== "present" && status !== "absent")) return;
+
+      const attendance = getAttendanceRecord(row.username);
+      attendance.status = status;
+      state.adminAttendanceDropdownIndex = null;
+      if (status === "present") {
+        attendance.checkIn = formatCurrentAdminTime();
+      }
+      renderAdmin();
+      return;
+    }
+
+    const attendanceToggleButton = event.target.closest("[data-admin-attendance-toggle]");
+    if (attendanceToggleButton) {
+      const rowIndex = Number(attendanceToggleButton.dataset.adminAttendanceToggle);
+      if (!Number.isFinite(rowIndex) || !getAdminAttendanceRows()[rowIndex]) return;
+
+      state.adminAttendanceDropdownIndex =
+        state.adminAttendanceDropdownIndex === rowIndex ? null : rowIndex;
+      renderAdmin();
+      return;
+    }
+
+    const timeButton = event.target.closest("[data-admin-attendance-time-open]");
+    if (timeButton) {
+      const pickerId = timeButton.dataset.adminAttendanceTimeOpen;
+      const timeInput = Array.from(
+        elements.adminMain.querySelectorAll("[data-admin-attendance-time-input]"),
+      ).find((input) => input.dataset.adminAttendanceTimeInput === pickerId);
+
+      openNativePicker(timeInput);
+      return;
+    }
+
+    const dateButton = event.target.closest("[data-admin-date-shift]");
+    if (dateButton) {
+      const dayShift = Number(dateButton.dataset.adminDateShift);
+      if (!Number.isFinite(dayShift)) return;
+
+      const nextDate = new Date(state.adminDate);
+      nextDate.setDate(nextDate.getDate() + dayShift);
+      state.adminDate = nextDate;
+      renderAdmin();
+      return;
+    }
+
+    const datePicker = event.target.closest("[data-admin-date-picker]");
+    if (datePicker) {
+      openNativePicker(datePicker.querySelector("[data-admin-date-input]"));
+    }
+  });
+
+  elements.adminMain.addEventListener("change", (event) => {
+    const dateInput = event.target.closest("[data-admin-date-input]");
+    if (dateInput) {
+      if (!dateInput.value) return;
+
+      const nextDate = new Date(`${dateInput.value}T00:00:00`);
+      if (Number.isNaN(nextDate.getTime())) return;
+
+      state.adminDate = nextDate;
+      renderAdmin();
+      return;
+    }
+
+    const timeInput = event.target.closest("[data-admin-attendance-time-input]");
+    if (!timeInput) return;
+
+    const [rowIndexText, field] = timeInput.dataset.adminAttendanceTimeInput.split(":");
+    const row = getAdminAttendanceRows()[Number(rowIndexText)];
+    if (!row || (field !== "checkIn" && field !== "checkOut")) return;
+
+    const displayValue = formatAdminTimeForDisplay(timeInput.value);
+    if (!displayValue) return;
+
+    getAttendanceRecord(row.username)[field] = displayValue;
+    renderAdmin();
+  });
+
+  elements.adminMain.addEventListener("submit", (event) => {
+    const memberForm = event.target.closest("[data-admin-member-form]");
+    if (!memberForm) return;
+
+    event.preventDefault();
+
+    const formData = new FormData(memberForm);
+    const name = String(formData.get("name") || "").trim();
+    const username = String(formData.get("username") || "").trim();
+    const password = String(formData.get("password") || "").trim();
+
+    if (!name || !username || password.length !== 5) return;
+    if (getAllAdminMembers().some((member) => normalizeUsername(member.username) === normalizeUsername(username))) {
+      return;
+    }
+
+    const members = adminMembersByRole[state.adminSettingsRole] || [];
+    const member = { name, username, password, id: null };
+    members.push(member);
+    adminMembersByRole[state.adminSettingsRole] = members;
+    persistAdminMemberToDatabase(member, state.adminSettingsRole);
+    state.adminAddMemberOpen = false;
+    renderAdmin();
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (state.adminAttendanceDropdownIndex === null || state.page !== "admin") return;
+  if (!(event.target instanceof Element)) return;
+  if (event.target.closest("[data-admin-attendance-dropdown]")) return;
+  if (elements.adminMain?.contains(event.target)) return;
+
+  state.adminAttendanceDropdownIndex = null;
+  if (state.adminView === "attendance") {
+    renderAdmin();
+  }
+});
 
 if (elements.menuSearch) {
   elements.menuSearch.addEventListener("input", (event) => {
@@ -3277,7 +4607,7 @@ if (elements.ticketsCountRow) {
 
 if (elements.ticketsTablesRow) {
   elements.ticketsTablesRow.addEventListener("click", () => {
-    goToChefTableOverview();
+    goToTicketsTableOverview();
   });
 }
 
@@ -3290,6 +4620,7 @@ if (elements.sousChefLiveCategories) {
     if (!categoryName) return;
 
     clearTicketsActionState();
+    state.ticketsBackRoute = "sous-chef";
     state.ticketsViewMode = "category";
     state.ticketsSelectedCategory = categoryName;
     state.ticketsSidebarCollapsed = false;
@@ -3300,6 +4631,13 @@ if (elements.sousChefLiveCategories) {
 
 if (elements.ticketsList) {
   elements.ticketsList.addEventListener("click", (event) => {
+    const actionTarget = event.target.closest(
+      "[data-ticket-overview-edit], [data-ticket-reject], [data-ticket-accept], [data-ticket-deliver], [data-ticket-reset]",
+    );
+    if (isAdminTicketReadOnly() && actionTarget) {
+      return;
+    }
+
     const overviewEditButton = event.target.closest("[data-ticket-overview-edit]");
     if (overviewEditButton) {
       openTicketsActionPopup(
@@ -3319,7 +4657,7 @@ if (elements.ticketsList) {
         "button, [data-ticket-accept], [data-ticket-reject], [data-ticket-deliver], [data-ticket-reset]",
       )
     ) {
-      goToChefTableOverview();
+      openTicketOverviewTable(overviewCard);
       return;
     }
 
@@ -3402,6 +4740,7 @@ if (elements.billList) {
         state.order[orderIndex].outAt = null;
         state.order[orderIndex].rejectedAt = null;
         state.order[orderIndex].deliveredAt = null;
+        state.order[orderIndex].captainDeliveredAt = null;
         if (state.billDeliveryPromptIndex === orderIndex) {
           state.billDeliveryPromptIndex = null;
         }
@@ -3431,6 +4770,7 @@ if (elements.billList) {
           : Date.now();
         state.order[orderIndex].rejectedAt = null;
         state.order[orderIndex].deliveredAt = null;
+        state.order[orderIndex].captainDeliveredAt = null;
         state.billDeliveryPromptIndex = null;
         persistCurrentOrder();
         renderBill();
@@ -3448,6 +4788,7 @@ if (elements.billList) {
       state.order[orderIndex].rejectedAt = Date.now();
       state.order[orderIndex].outAt = null;
       state.order[orderIndex].deliveredAt = null;
+      state.order[orderIndex].captainDeliveredAt = null;
       if (state.billDeliveryPromptIndex === orderIndex) {
         state.billDeliveryPromptIndex = null;
       }
@@ -3587,12 +4928,21 @@ window.setInterval(() => {
     updateTicketTimers();
   }
 
+  if (state.page === "admin") {
+    updateAdminTicketTimers();
+  }
+
   if (state.page === "captain-delivery" && elements.captainDeliveryList) {
     updateCaptainDeliveryTimers();
   }
 }, 1000);
 
 (async () => {
+  await hydrateUsersFromDatabase().catch((error) => {
+    console.warn("User hydration failed:", error);
+  });
+  ensureDefaultAdminMember();
+
   await hydrateDiningTablesFromDatabase().catch((error) => {
     console.warn("Dining table hydration failed:", error);
   });
