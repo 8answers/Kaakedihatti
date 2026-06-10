@@ -125,6 +125,9 @@ create table if not exists orders (
   opened_by_user_id bigint references users(id),
   shared_at timestamptz,
   opened_at timestamptz not null default now(),
+  payment_method text,
+  payment_receipt_file_name text,
+  payment_receipt_image text,
   closed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -136,6 +139,9 @@ alter table orders add column if not exists status order_status not null default
 alter table orders add column if not exists opened_by_user_id bigint references users(id);
 alter table orders add column if not exists shared_at timestamptz;
 alter table orders add column if not exists opened_at timestamptz not null default now();
+alter table orders add column if not exists payment_method text;
+alter table orders add column if not exists payment_receipt_file_name text;
+alter table orders add column if not exists payment_receipt_image text;
 alter table orders add column if not exists closed_at timestamptz;
 alter table orders add column if not exists created_at timestamptz not null default now();
 alter table orders add column if not exists updated_at timestamptz not null default now();

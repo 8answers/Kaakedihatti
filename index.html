@@ -722,6 +722,30 @@
       </section>
     </div>
 
+    <div class="payment-receipt-viewer" data-payment-receipt-viewer hidden aria-hidden="true">
+      <div
+        class="payment-receipt-viewer__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-receipt-viewer-title"
+      >
+        <div class="payment-receipt-viewer__header">
+          <div class="payment-receipt-viewer__title" id="payment-receipt-viewer-title">
+            Payment Screenshot
+          </div>
+          <button
+            class="payment-receipt-viewer__close"
+            type="button"
+            data-payment-receipt-viewer-close
+            aria-label="Close payment screenshot"
+          >
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <img class="payment-receipt-viewer__image" src="" alt="Payment screenshot" data-payment-receipt-viewer-image />
+      </div>
+    </div>
+
     <script src="app.js"></script>
   </body>
 </html>

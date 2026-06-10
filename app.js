@@ -364,8 +364,11 @@ const elements = {
   loginError: document.querySelector("[data-login-error]"),
   loginUsername: document.querySelector("[data-login-username]"),
   loginPassword: document.querySelector("[data-login-password]"),
+  adminShell: document.querySelector(".admin-shell"),
+  adminBackButton: document.querySelector('[data-page="admin"] [data-nav="home"]'),
   adminTitle: document.querySelector("[data-admin-title]"),
   adminMain: document.querySelector("[data-admin-main]"),
+  adminDivider: document.querySelector(".admin-divider"),
   adminSidebar: document.querySelector("[data-admin-sidebar]"),
   captainTableGrid: document.querySelector('[data-page="captain"] .table-grid'),
   menuTitle: document.querySelector("[data-menu-title]"),
@@ -432,6 +435,9 @@ const elements = {
   paymentReceipt: document.querySelector("[data-payment-receipt]"),
   paymentReceiptLabel: document.querySelector("[data-payment-receipt-label]"),
   paymentCloseConfirm: document.querySelector("[data-payment-close-confirm]"),
+  paymentReceiptViewer: document.querySelector("[data-payment-receipt-viewer]"),
+  paymentReceiptViewerClose: document.querySelector("[data-payment-receipt-viewer-close]"),
+  paymentReceiptViewerImage: document.querySelector("[data-payment-receipt-viewer-image]"),
   dishModal: document.querySelector("[data-dish-modal]"),
   dishModalTitle: document.querySelector("[data-dish-modal-title]"),
   dishModalNote: document.querySelector("[data-dish-modal-note]"),
@@ -445,6 +451,7 @@ const state = {
   search: "",
   expandedCategories: new Set(),
   tableOrders: new Map(),
+  closedPaymentBills: new Map(),
   captainDraftStartedAtByTable: new Map(),
   diningTableIdsByNumber: new Map(),
   diningTableNumbersById: new Map(),
@@ -478,6 +485,9 @@ const state = {
   paymentCloseOpen: false,
   paymentMethod: "",
   paymentReceiptFileName: "",
+  paymentReceiptImageData: "",
+  paymentReceiptReadPending: false,
+  activePaymentReceiptImageData: "",
 };
 
 const adminSidebarItems = [
@@ -485,6 +495,7 @@ const adminSidebarItems = [
   { view: "tables", route: "admin-tables", label: "Table Overview" },
   { view: "attendance", route: "admin-attendance", label: "Staff Attendance" },
   { view: "tickets", route: "tickets", label: "Ticket Status" },
+  { view: "payments", route: "admin-payments", label: "Payments" },
   { view: "settings", route: "admin-settings", label: "Settings" },
 ];
 
@@ -667,8 +678,21 @@ function parseRoute() {
     return { page: "tickets" };
   }
 
+  if (hash === "admin-payments") {
+    return { page: "admin", adminView: "payments" };
+  }
+
   if (hash === "admin-settings") {
     return { page: "admin", adminView: "settings" };
+  }
+
+  if (hash.startsWith("admin-payment-")) {
+    const tableNumber = Number(hash.slice(14));
+    return {
+      page: "admin",
+      adminView: "payment-detail",
+      tableNumber: Number.isFinite(tableNumber) && tableNumber > 0 ? tableNumber : 1,
+    };
   }
 
   if (hash.startsWith("admin-table-")) {
@@ -752,8 +776,18 @@ function setRoute(page, tableNumber = 1, options = {}) {
     return;
   }
 
+  if (page === "admin-payments") {
+    updateHash("#admin-payments", options);
+    return;
+  }
+
   if (page === "admin-settings") {
     updateHash("#admin-settings", options);
+    return;
+  }
+
+  if (page === "admin-payment-detail") {
+    updateHash(`#admin-payment-${tableNumber}`, options);
     return;
   }
 
@@ -1077,6 +1111,52 @@ function mapOrderItemForDb(item, sortOrder) {
   };
 }
 
+function getTableNumberFromOrderRow(row) {
+  return Number(
+    row.table_number ?? state.diningTableNumbersById.get(Number(row.table_id)) ?? row.table_id,
+  );
+}
+
+function mapDbOrderItems(orderItems) {
+  return Array.isArray(orderItems)
+    ? orderItems
+        .slice()
+        .sort((left, right) => (Number(left.sort_order) || 0) - (Number(right.sort_order) || 0))
+        .map(mapDbOrderItem)
+    : [];
+}
+
+function createClosedPaymentBill(
+  tableNumber,
+  orderItems,
+  {
+    id = null,
+    closedAt = Date.now(),
+    paymentMethod = "",
+    paymentReceiptFileName = "",
+    paymentReceiptImage = "",
+  } = {},
+) {
+  return {
+    id,
+    tableNumber,
+    closedAt: Number.isFinite(closedAt) ? closedAt : Date.now(),
+    paymentMethod,
+    paymentReceiptFileName,
+    paymentReceiptImage,
+    orderItems: cloneOrderItems(orderItems),
+  };
+}
+
+function setClosedPaymentBill(bill) {
+  if (!bill || !Number.isFinite(bill.tableNumber) || !bill.orderItems.length) return;
+
+  const existingBill = state.closedPaymentBills.get(bill.tableNumber);
+  if (existingBill && Number(existingBill.closedAt) > Number(bill.closedAt)) return;
+
+  state.closedPaymentBills.set(bill.tableNumber, bill);
+}
+
 function enqueueDatabaseWrite(task) {
   databaseWriteQueue = databaseWriteQueue
     .then(() => databaseBootstrapPromise)
@@ -1182,17 +1262,10 @@ async function hydrateOrdersFromDatabase() {
   for (const row of rows || []) {
     if (row.status === "closed" || row.status === "cancelled") continue;
 
-    const tableNumber = Number(
-      row.table_number ?? state.diningTableNumbersById.get(Number(row.table_id)) ?? row.table_id,
-    );
+    const tableNumber = getTableNumberFromOrderRow(row);
     if (!Number.isFinite(tableNumber)) continue;
 
-    const orderItems = Array.isArray(row.order_items)
-      ? row.order_items
-          .slice()
-          .sort((left, right) => (Number(left.sort_order) || 0) - (Number(right.sort_order) || 0))
-          .map(mapDbOrderItem)
-      : [];
+    const orderItems = mapDbOrderItems(row.order_items);
 
     if (orderItems.length > 0) {
       tableOrders.set(tableNumber, orderItems);
@@ -1201,6 +1274,48 @@ async function hydrateOrdersFromDatabase() {
 
   state.tableOrders = tableOrders;
   databaseHydrated = true;
+}
+
+async function hydrateClosedPaymentBillsFromDatabase() {
+  let rows = [];
+  try {
+    rows = await supabaseRequest("orders", {
+      query: {
+        select:
+          "id,table_number,table_id,status,closed_at,payment_method,payment_receipt_file_name,payment_receipt_image,order_items(*)",
+        status: "eq.closed",
+        order: "closed_at.asc",
+      },
+    });
+  } catch (error) {
+    console.warn("Payment receipt fields are not available yet:", error);
+    rows = await supabaseRequest("orders", {
+      query: {
+        select: "id,table_number,table_id,status,closed_at,order_items(*)",
+        status: "eq.closed",
+        order: "closed_at.asc",
+      },
+    });
+  }
+
+  state.closedPaymentBills = new Map();
+  for (const row of rows || []) {
+    const tableNumber = getTableNumberFromOrderRow(row);
+    if (!Number.isFinite(tableNumber)) continue;
+
+    const orderItems = mapDbOrderItems(row.order_items);
+    if (!orderItems.length) continue;
+
+    setClosedPaymentBill(
+      createClosedPaymentBill(tableNumber, orderItems, {
+        id: row.id ?? null,
+        closedAt: fromSupabaseTimestamp(row.closed_at) ?? Date.now(),
+        paymentMethod: row.payment_method || "",
+        paymentReceiptFileName: row.payment_receipt_file_name || "",
+        paymentReceiptImage: row.payment_receipt_image || "",
+      }),
+    );
+  }
 }
 
 async function hydrateDiningTablesFromDatabase() {
@@ -1381,7 +1496,7 @@ async function persistOrderToDatabase(tableNumber, orderItems) {
   }
 }
 
-async function closeOrderInDatabase(tableNumber) {
+async function closeOrderInDatabase(tableNumber, paymentDetails = {}) {
   if (!Number.isFinite(tableNumber)) return;
 
   const existingOrderRows = await supabaseRequest("orders", {
@@ -1395,6 +1510,28 @@ async function closeOrderInDatabase(tableNumber) {
   const existingOrderId = existingOrderRows?.[0]?.id || null;
   if (!existingOrderId) return;
 
+  const closePayload = {
+    status: "closed",
+    closed_at: new Date().toISOString(),
+    payment_method: paymentDetails.paymentMethod || null,
+    payment_receipt_file_name: paymentDetails.paymentReceiptFileName || null,
+    payment_receipt_image: paymentDetails.paymentReceiptImage || null,
+  };
+
+  try {
+    await supabaseRequest("orders", {
+      method: "PATCH",
+      query: {
+        id: `eq.${existingOrderId}`,
+      },
+      prefer: "return=minimal",
+      body: closePayload,
+    });
+    return;
+  } catch (error) {
+    console.warn("Payment receipt could not be saved with the closed order:", error);
+  }
+
   await supabaseRequest("orders", {
     method: "PATCH",
     query: {
@@ -1403,7 +1540,7 @@ async function closeOrderInDatabase(tableNumber) {
     prefer: "return=minimal",
     body: {
       status: "closed",
-      closed_at: new Date().toISOString(),
+      closed_at: closePayload.closed_at,
     },
   });
 }
@@ -1481,6 +1618,7 @@ function syncBodyModalOpen() {
     elements.dishModal,
     elements.ticketsActionPopup,
     elements.paymentCloseModal,
+    elements.paymentReceiptViewer,
   ].some(isElementVisible);
   document.body.classList.toggle("modal-open", hasOpenModal);
 }
@@ -1702,6 +1840,8 @@ function resetPaymentCloseForm() {
   state.paymentCloseOpen = false;
   state.paymentMethod = "";
   state.paymentReceiptFileName = "";
+  state.paymentReceiptImageData = "";
+  state.paymentReceiptReadPending = false;
 
   if (elements.paymentMethod) {
     elements.paymentMethod.value = "";
@@ -1716,7 +1856,12 @@ function syncPaymentCloseModal() {
   if (!elements.paymentCloseModal) return;
 
   const shouldShow = state.paymentCloseOpen && state.page === "menu" && state.order.length > 0;
-  const canClose = Boolean(state.paymentMethod && state.paymentReceiptFileName);
+  const canClose = Boolean(
+    state.paymentMethod &&
+      state.paymentReceiptFileName &&
+      state.paymentReceiptImageData &&
+      !state.paymentReceiptReadPending,
+  );
   const canUploadReceipt = Boolean(state.paymentMethod);
 
   elements.paymentCloseModal.hidden = !shouldShow;
@@ -1727,7 +1872,9 @@ function syncPaymentCloseModal() {
   }
 
   if (elements.paymentReceiptLabel) {
-    elements.paymentReceiptLabel.textContent = state.paymentReceiptFileName || "Upload Payment Image";
+    elements.paymentReceiptLabel.textContent = state.paymentReceiptReadPending
+      ? "Reading Payment Image..."
+      : state.paymentReceiptFileName || "Upload Payment Image";
   }
 
   if (elements.paymentReceipt) {
@@ -1773,10 +1920,24 @@ function closePaymentClosePopup() {
 }
 
 function completePaymentClose() {
-  if (!state.order.length || !state.paymentMethod || !state.paymentReceiptFileName) return;
+  if (
+    !state.order.length ||
+    !state.paymentMethod ||
+    !state.paymentReceiptFileName ||
+    !state.paymentReceiptImageData ||
+    state.paymentReceiptReadPending
+  ) {
+    return;
+  }
   if (!isPaymentPendingOrder(state.order)) return;
 
   const tableNumber = state.tableNumber;
+  const paymentDetails = {
+    paymentMethod: state.paymentMethod,
+    paymentReceiptFileName: state.paymentReceiptFileName,
+    paymentReceiptImage: state.paymentReceiptImageData,
+  };
+  setClosedPaymentBill(createClosedPaymentBill(tableNumber, state.order, paymentDetails));
   state.tableOrders.set(tableNumber, []);
   state.captainDraftStartedAtByTable.delete(tableNumber);
   state.order = [];
@@ -1789,7 +1950,7 @@ function completePaymentClose() {
   state.captainDeliveryPopupPosition = null;
   resetPaymentCloseForm();
 
-  enqueueDatabaseWrite(() => closeOrderInDatabase(tableNumber));
+  enqueueDatabaseWrite(() => closeOrderInDatabase(tableNumber, paymentDetails));
   renderMenu();
   renderCaptain();
   renderSousChef();
@@ -2309,7 +2470,40 @@ function openNativePicker(inputElement) {
   inputElement.click();
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("Unable to read image")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openPaymentReceiptViewer(imageData) {
+  if (!elements.paymentReceiptViewer || !elements.paymentReceiptViewerImage || !imageData) return;
+
+  state.activePaymentReceiptImageData = imageData;
+  elements.paymentReceiptViewerImage.src = imageData;
+  elements.paymentReceiptViewer.hidden = false;
+  elements.paymentReceiptViewer.setAttribute("aria-hidden", "false");
+  syncBodyModalOpen();
+}
+
+function closePaymentReceiptViewer() {
+  if (!elements.paymentReceiptViewer || !elements.paymentReceiptViewerImage) return;
+
+  state.activePaymentReceiptImageData = "";
+  elements.paymentReceiptViewerImage.removeAttribute("src");
+  elements.paymentReceiptViewer.hidden = true;
+  elements.paymentReceiptViewer.setAttribute("aria-hidden", "true");
+  syncBodyModalOpen();
+}
+
 function getAdminTitle() {
+  if (state.adminView === "payment-detail") {
+    return `Table ${state.tableNumber} Order (Bill)`;
+  }
+
   return state.adminView === "table-detail" ? "Admin (Ticket Status)" : "Admin";
 }
 
@@ -2417,6 +2611,187 @@ function buildAdminTableGridMarkup() {
           >${tableNumber}</button>`;
       }).join("")}
     </div>`;
+}
+
+function getAdminPaymentCaptainName() {
+  const captain = (adminMembersByRole.captain || []).find(
+    (member) => member.isActive !== false && String(member.name || "").trim(),
+  );
+
+  return captain?.name || "NA";
+}
+
+function getAdminPaymentRows() {
+  const livePaymentRows = Array.from(state.tableOrders.entries())
+    .filter(([tableNumber, orderItems]) => Number.isFinite(tableNumber) && isPaymentPendingOrder(orderItems))
+    .map(([tableNumber, orderItems]) => ({
+      tableNumber,
+      orderItems,
+      closedAt: null,
+    }));
+  const livePaymentTables = new Set(livePaymentRows.map((row) => row.tableNumber));
+  const closedPaymentRows = Array.from(state.closedPaymentBills.values())
+    .filter((bill) => !livePaymentTables.has(bill.tableNumber))
+    .map((bill) => ({
+      tableNumber: bill.tableNumber,
+      orderItems: bill.orderItems,
+      closedAt: bill.closedAt,
+    }));
+
+  return [...livePaymentRows, ...closedPaymentRows]
+    .sort((left, right) => {
+      const leftClosedAt = Number(left.closedAt);
+      const rightClosedAt = Number(right.closedAt);
+      if (Number.isFinite(leftClosedAt) || Number.isFinite(rightClosedAt)) {
+        return (
+          (Number.isFinite(rightClosedAt) ? rightClosedAt : 0) -
+          (Number.isFinite(leftClosedAt) ? leftClosedAt : 0)
+        );
+      }
+      return left.tableNumber - right.tableNumber;
+    })
+    .map((row, index) => ({
+      billNumber: index + 1,
+      tableNumber: row.tableNumber,
+      captainName: getAdminPaymentCaptainName(row.tableNumber, row.orderItems),
+      amount: row.orderItems.reduce((sum, item) => sum + getOrderItemTotalPrice(item), 0),
+      orderItems: row.orderItems,
+    }));
+}
+
+function buildAdminPaymentsMarkup() {
+  const paymentRows = getAdminPaymentRows();
+
+  return `
+    <section class="admin-payments" aria-label="Payments">
+      <div class="admin-payments__row admin-payments__row--head" role="row">
+        <div class="admin-payments__bill">Bill No.</div>
+        <div class="admin-payments__table">Table No.</div>
+        <div class="admin-payments__captain">Captain</div>
+        <div class="admin-payments__amount">Amount</div>
+        <div class="admin-payments__arrow" aria-hidden="true">›</div>
+      </div>
+      ${
+        paymentRows.length
+          ? paymentRows
+              .map(
+                (row) => `
+                  <button
+                    class="admin-payments__row admin-payments__row--item"
+                    type="button"
+                    data-admin-payment-table="${escapeHtml(String(row.tableNumber))}"
+                    aria-label="Open bill ${escapeHtml(String(row.billNumber))} for table ${escapeHtml(
+                      String(row.tableNumber),
+                    )}"
+                  >
+                    <div class="admin-payments__bill">${escapeHtml(String(row.billNumber))}</div>
+                    <div class="admin-payments__table">${escapeHtml(String(row.tableNumber))}</div>
+                    <div class="admin-payments__captain">${escapeHtml(row.captainName)}</div>
+                    <div class="admin-payments__amount">${escapeHtml(formatMoneyAmount(row.amount, { currency: true }))}</div>
+                    <div class="admin-payments__arrow" aria-hidden="true">›</div>
+                  </button>`,
+              )
+              .join("")
+          : '<div class="admin-payments__empty">NA</div>'
+      }
+    </section>`;
+}
+
+function buildAdminPaymentDetailRowsMarkup(orderItems) {
+  return orderItems
+    .map((item, index) => {
+      const unitPrice = getOrderItemUnitPrice(item);
+      const totalPrice = getOrderItemTotalPrice(item);
+
+      return `
+        <li class="admin-payment-detail__item">
+          <div class="admin-payment-detail__item-main">
+            <div class="admin-payment-detail__item-name">
+              <span class="admin-payment-detail__item-index">${escapeHtml(`${index + 1}.`)}</span>
+              <span class="admin-payment-detail__item-dish">${escapeHtml(item.dishName)}</span>
+            </div>
+            <div class="admin-payment-detail__item-qty">${escapeHtml(String(item.quantity))}</div>
+            <div class="admin-payment-detail__item-unit">${escapeHtml(formatMoneyAmount(unitPrice))}</div>
+            <div class="admin-payment-detail__item-total">${escapeHtml(formatMoneyAmount(totalPrice))}</div>
+          </div>
+          ${
+            item.note
+              ? `<div class="admin-payment-detail__item-note-row">
+                  <div class="admin-payment-detail__item-note">${escapeHtml(item.note)}</div>
+                </div>`
+              : ""
+          }
+        </li>`;
+    })
+    .join("");
+}
+
+function buildAdminPaymentDetailTotalMarkup(orderItems) {
+  const totalQuantity = orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+  const totalAmount = orderItems.reduce((sum, item) => sum + getOrderItemTotalPrice(item), 0);
+
+  return `
+    <div class="admin-payment-detail__total-label">Total</div>
+    <div class="admin-payment-detail__total-qty">${escapeHtml(String(totalQuantity))}</div>
+    <div class="admin-payment-detail__total-spacer" aria-hidden="true"></div>
+    <div class="admin-payment-detail__total-amount">${escapeHtml(formatMoneyAmount(totalAmount, { currency: true }))}</div>
+  `;
+}
+
+function buildAdminPaymentDetailMarkup() {
+  const liveOrderItems = state.tableOrders.get(state.tableNumber) || [];
+  const closedBill = state.closedPaymentBills.get(state.tableNumber);
+  const orderItems = isPaymentPendingOrder(liveOrderItems)
+    ? liveOrderItems
+    : closedBill?.orderItems || [];
+  const paymentReceiptImage = closedBill?.paymentReceiptImage || "";
+  const hasOrder = orderItems.length > 0;
+
+  return `
+    <section class="admin-payment-detail" aria-label="Payment bill detail">
+      <div class="admin-payment-detail__header">
+        <span>Order</span>
+        <button
+          class="admin-payment-detail__receipt"
+          type="button"
+          data-admin-payment-receipt
+          aria-label="Open payment screenshot"
+          ${paymentReceiptImage ? "" : "disabled"}
+        >
+          <img src="./Payment screenshots.png" alt="" aria-hidden="true" />
+        </button>
+      </div>
+      ${
+        hasOrder
+          ? `
+            <div class="admin-payment-detail__columns" aria-hidden="true">
+              <div class="admin-payment-detail__column admin-payment-detail__column--items">Items</div>
+              <div class="admin-payment-detail__column admin-payment-detail__column--qty">Qty</div>
+              <div class="admin-payment-detail__column admin-payment-detail__column--unit">Unit Prize (₹)</div>
+              <div class="admin-payment-detail__column admin-payment-detail__column--total">Total Cost (₹)</div>
+            </div>
+            <div class="admin-payment-detail__list-wrap">
+              <ul class="admin-payment-detail__list">
+                ${buildAdminPaymentDetailRowsMarkup(orderItems)}
+              </ul>
+            </div>
+            <div class="admin-payment-detail__divider" aria-hidden="true"></div>
+            <div class="admin-payment-detail__total">
+              ${buildAdminPaymentDetailTotalMarkup(orderItems)}
+            </div>
+            <div class="admin-payment-detail__footer">
+              <button class="admin-payment-detail__print" type="button" data-admin-payment-print>
+                <span>Print</span>
+                <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
+                  <path d="M7 8V3h10v5"></path>
+                  <path d="M7 17H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"></path>
+                  <path d="M7 14h10v7H7z"></path>
+                </svg>
+              </button>
+            </div>`
+          : '<div class="admin-payment-detail__empty">NA</div>'
+      }
+    </section>`;
 }
 
 function buildAdminAttendanceMarkup() {
@@ -2771,15 +3146,28 @@ function updateAdminTicketTimers() {
 
 function renderAdmin() {
   if (!elements.adminMain || !elements.adminSidebar) return;
+  const isPaymentDetail = state.adminView === "payment-detail";
 
   if (elements.adminTitle) {
     elements.adminTitle.textContent = getAdminTitle();
+  }
+
+  if (elements.adminBackButton) {
+    elements.adminBackButton.setAttribute(
+      "aria-label",
+      isPaymentDetail ? "Back to payments" : "Back to home",
+    );
   }
 
   if (state.adminView !== "settings") {
     state.adminAddMemberOpen = false;
   }
 
+  elements.adminShell?.classList.toggle("admin-shell--full", isPaymentDetail);
+  if (elements.adminDivider) {
+    elements.adminDivider.hidden = isPaymentDetail;
+  }
+  elements.adminSidebar.hidden = isPaymentDetail;
   elements.adminSidebar.classList.toggle("admin-sidebar--settings", state.adminView === "settings");
   elements.adminSidebar.innerHTML = buildAdminSidebarMarkup();
 
@@ -2790,6 +3178,10 @@ function renderAdmin() {
     syncAdminTableColors();
   } else if (state.adminView === "attendance") {
     elements.adminMain.innerHTML = buildAdminAttendanceMarkup();
+  } else if (state.adminView === "payments") {
+    elements.adminMain.innerHTML = buildAdminPaymentsMarkup();
+  } else if (state.adminView === "payment-detail") {
+    elements.adminMain.innerHTML = buildAdminPaymentDetailMarkup();
   } else if (state.adminView === "table-detail") {
     elements.adminMain.innerHTML = buildAdminTicketDetailMarkup();
     updateAdminTicketTimers();
@@ -4177,6 +4569,11 @@ for (const button of elements.navButtons) {
   button.addEventListener("click", () => {
     const target = button.dataset.nav;
     if (target === "home") {
+      if (state.page === "admin" && state.adminView === "payment-detail") {
+        setRoute("admin-payments", state.tableNumber);
+        return;
+      }
+
       state.currentUser = null;
       state.loginTarget = null;
       state.loginError = "";
@@ -4287,6 +4684,28 @@ if (elements.adminMain) {
       if (Number.isFinite(tableNumber)) {
         setRoute("admin-table-detail", tableNumber);
       }
+      return;
+    }
+
+    const paymentRow = event.target.closest("[data-admin-payment-table]");
+    if (paymentRow) {
+      const tableNumber = Number(paymentRow.dataset.adminPaymentTable);
+      if (Number.isFinite(tableNumber)) {
+        setRoute("admin-payment-detail", tableNumber);
+      }
+      return;
+    }
+
+    const paymentReceiptButton = event.target.closest("[data-admin-payment-receipt]");
+    if (paymentReceiptButton) {
+      const receiptImage = state.closedPaymentBills.get(state.tableNumber)?.paymentReceiptImage || "";
+      openPaymentReceiptViewer(receiptImage);
+      return;
+    }
+
+    const paymentPrintButton = event.target.closest("[data-admin-payment-print]");
+    if (paymentPrintButton) {
+      window.print();
       return;
     }
 
@@ -4518,11 +4937,24 @@ if (elements.paymentCloseModal) {
   });
 }
 
+if (elements.paymentReceiptViewer) {
+  elements.paymentReceiptViewer.addEventListener("click", (event) => {
+    if (
+      event.target === elements.paymentReceiptViewer ||
+      event.target.closest("[data-payment-receipt-viewer-close]")
+    ) {
+      closePaymentReceiptViewer();
+    }
+  });
+}
+
 if (elements.paymentMethod) {
   elements.paymentMethod.addEventListener("change", (event) => {
     state.paymentMethod = event.target.value;
     if (!state.paymentMethod) {
       state.paymentReceiptFileName = "";
+      state.paymentReceiptImageData = "";
+      state.paymentReceiptReadPending = false;
       if (elements.paymentReceipt) {
         elements.paymentReceipt.value = "";
       }
@@ -4532,10 +4964,32 @@ if (elements.paymentMethod) {
 }
 
 if (elements.paymentReceipt) {
-  elements.paymentReceipt.addEventListener("change", (event) => {
+  elements.paymentReceipt.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     state.paymentReceiptFileName = file?.name || "";
+    state.paymentReceiptImageData = "";
+    state.paymentReceiptReadPending = Boolean(file);
     syncPaymentCloseModal();
+
+    if (!file) return;
+
+    try {
+      const imageData = await readFileAsDataUrl(file);
+      if (elements.paymentReceipt?.files?.[0] !== file) return;
+      state.paymentReceiptImageData = imageData;
+    } catch (error) {
+      console.warn("Payment image could not be read:", error);
+      if (elements.paymentReceipt?.files?.[0] === file) {
+        state.paymentReceiptFileName = "";
+        state.paymentReceiptImageData = "";
+        elements.paymentReceipt.value = "";
+      }
+    } finally {
+      if (elements.paymentReceipt?.files?.[0] === file) {
+        state.paymentReceiptReadPending = false;
+        syncPaymentCloseModal();
+      }
+    }
   });
 }
 
@@ -4854,6 +5308,11 @@ if (elements.dishModalNote) {
 window.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
 
+  if (state.activePaymentReceiptImageData) {
+    closePaymentReceiptViewer();
+    return;
+  }
+
   if (state.paymentCloseOpen) {
     closePaymentClosePopup();
     return;
@@ -4947,7 +5406,10 @@ window.setInterval(() => {
     console.warn("Dining table hydration failed:", error);
   });
 
-  databaseBootstrapPromise = hydrateOrdersFromDatabase().catch((error) => {
+  databaseBootstrapPromise = Promise.all([
+    hydrateOrdersFromDatabase(),
+    hydrateClosedPaymentBillsFromDatabase(),
+  ]).catch((error) => {
     console.warn("Supabase hydration failed:", error);
   });
 

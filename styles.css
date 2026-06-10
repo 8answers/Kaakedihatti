@@ -253,6 +253,9 @@ body.modal-open {
 .order-bill:focus-visible,
 .order-share:focus-visible,
 .admin-sidebar__row:focus-visible,
+.admin-payments__row--item:focus-visible,
+.admin-payment-detail__receipt:focus-visible,
+.admin-payment-detail__print:focus-visible,
 .admin-table-grid .table-tile:focus-visible,
 .admin-date-nav:focus-visible {
   outline: 2px solid #fff;
@@ -410,6 +413,272 @@ body.modal-open {
   grid-template-columns: repeat(8, 100px);
   width: 933px;
   gap: 19px;
+}
+
+.admin-shell--full {
+  padding-left: 0;
+}
+
+.admin-shell--full .admin-main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+}
+
+.admin-payments {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.admin-payments__row {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 300px 220px 16px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 24px;
+  color: #fff;
+  font: 400 24px/1 "Kulim Park", sans-serif;
+}
+
+.admin-payments__row--item {
+  border: 0;
+  border-radius: 0;
+  background: #191919;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-payments__row--item:hover {
+  background: #222;
+}
+
+.admin-payments__table,
+.admin-payments__captain,
+.admin-payments__amount,
+.admin-payments__arrow {
+  text-align: center;
+}
+
+.admin-payments__captain,
+.admin-payments__amount {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-payments__arrow {
+  font-size: 32px;
+  line-height: 0.7;
+}
+
+.admin-payments__empty {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #191919;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  padding: 8px 24px;
+}
+
+.admin-payment-detail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-bottom: 88px;
+}
+
+.admin-payment-detail__header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #191919;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  padding-left: 24px;
+}
+
+.admin-payment-detail__receipt {
+  align-self: stretch;
+  width: 40px;
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+  flex: 0 0 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-payment-detail__receipt:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.admin-payment-detail__receipt img {
+  width: 28px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+}
+
+.admin-payment-detail__columns,
+.admin-payment-detail__item-main,
+.admin-payment-detail__total {
+  display: grid;
+  grid-template-columns: minmax(0, 268px) 50px 145px 145px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-payment-detail__columns {
+  margin-top: 16px;
+}
+
+.admin-payment-detail__column--qty,
+.admin-payment-detail__item-qty,
+.admin-payment-detail__total-qty {
+  text-align: center;
+}
+
+.admin-payment-detail__column--unit,
+.admin-payment-detail__item-unit {
+  text-align: right;
+}
+
+.admin-payment-detail__column--total,
+.admin-payment-detail__item-total,
+.admin-payment-detail__total-amount {
+  text-align: right;
+}
+
+.admin-payment-detail__list-wrap {
+  flex: 0 1 auto;
+  max-height: calc(100vh - 280px);
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-payment-detail__list {
+  list-style: none;
+  margin: 0;
+  padding: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-payment-detail__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-payment-detail__item-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-payment-detail__item-index {
+  flex: 0 0 auto;
+  margin-right: 4px;
+}
+
+.admin-payment-detail__item-dish {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-payment-detail__item-note-row {
+  padding: 0 24px 0 62px;
+}
+
+.admin-payment-detail__item-note {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-payment-detail__divider {
+  height: 1px;
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.admin-payment-detail__total {
+  min-height: 40px;
+  margin-top: 16px;
+}
+
+.admin-payment-detail__empty {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-payment-detail__footer {
+  position: fixed;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+}
+
+.admin-payment-detail__print {
+  width: 100%;
+  height: 40px;
+  border: 0;
+  background: #0084ff;
+  color: #fff;
+  font: 700 32px/1 "Kulim Park", sans-serif;
+  padding: 8px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.admin-payment-detail__print svg {
+  width: 25px;
+  height: 24px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-settings {
@@ -704,6 +973,10 @@ body.modal-open {
   background: rgba(255, 255, 255, 0.35);
 }
 
+.admin-divider[hidden] {
+  display: none !important;
+}
+
 .admin-divider__handle {
   position: absolute;
   top: 50%;
@@ -727,6 +1000,10 @@ body.modal-open {
   justify-content: flex-start;
   gap: 16px;
   padding-top: 24px;
+}
+
+.admin-sidebar[hidden] {
+  display: none !important;
 }
 
 .admin-sidebar__group {
@@ -3658,6 +3935,89 @@ body.modal-open {
   outline-offset: 3px;
 }
 
+.payment-receipt-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.76);
+}
+
+.payment-receipt-viewer[hidden] {
+  display: none !important;
+}
+
+.payment-receipt-viewer__dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #000;
+}
+
+.payment-receipt-viewer__header {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #262626;
+  color: #fff;
+}
+
+.payment-receipt-viewer__title {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.payment-receipt-viewer__close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+
+.payment-receipt-viewer__close span::before,
+.payment-receipt-viewer__close span::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 1px;
+  width: 2px;
+  height: 26px;
+  background: currentColor;
+}
+
+.payment-receipt-viewer__close span::before {
+  transform: rotate(45deg);
+}
+
+.payment-receipt-viewer__close span::after {
+  transform: rotate(-45deg);
+}
+
+.payment-receipt-viewer__image {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 96px);
+  object-fit: contain;
+  background: #fff;
+}
+
+.payment-receipt-viewer__close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
 .dish-modal__dialog {
   width: min(571px, calc(100vw - 32px));
   display: flex;
@@ -3922,6 +4282,11 @@ body.modal-open {
     max-width: none;
   }
 
+  .admin-shell--full {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   .table-grid {
     grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     gap: 12px;
@@ -3980,6 +4345,11 @@ body.modal-open {
     padding-right: 16px;
   }
 
+  .admin-shell--full {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   .tickets-list--overview,
   .tickets-empty--overview {
     width: 100%;
@@ -3999,6 +4369,21 @@ body.modal-open {
     flex: 1 1 auto;
     width: 100%;
     max-width: none;
+  }
+
+  .admin-payments {
+    min-width: 640px;
+  }
+
+  .admin-payments__row {
+    grid-template-columns: minmax(0, 1fr) 92px 220px 150px 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    font-size: 18px;
+  }
+
+  .admin-payments__arrow {
+    font-size: 24px;
   }
 
   .table-grid--sous-chef,
@@ -4605,12 +4990,18 @@ body.modal-open {
 
   .captain-bill__header,
   .captain-delivery__header,
+  .admin-payment-detail__header,
   .captain-bill__empty,
   .captain-delivery__empty,
+  .admin-payment-detail__empty,
   .captain-bill__columns,
   .captain-bill__item-main,
   .captain-bill__total,
   .captain-bill__item-note,
+  .admin-payment-detail__columns,
+  .admin-payment-detail__item-main,
+  .admin-payment-detail__total,
+  .admin-payment-detail__item-note,
   .captain-delivery__columns,
   .captain-delivery__item-main,
   .captain-delivery__item-note {
@@ -4621,6 +5012,15 @@ body.modal-open {
   .captain-bill__item-main,
   .captain-bill__total {
     grid-template-columns: minmax(0, 1fr) 36px 90px 36px 90px;
+    gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .admin-payment-detail__columns,
+  .admin-payment-detail__item-main,
+  .admin-payment-detail__total {
+    grid-template-columns: minmax(0, 1fr) 36px 90px 90px;
     gap: 12px;
     padding-left: 16px;
     padding-right: 16px;
@@ -4645,12 +5045,14 @@ body.modal-open {
   }
 
   .captain-bill__item-note-row,
+  .admin-payment-detail__item-note-row,
   .captain-delivery__item-note-row {
     padding-left: 48px;
     padding-right: 16px;
   }
 
-  .captain-bill__print {
+  .captain-bill__print,
+  .admin-payment-detail__print {
     height: 36px;
     font-size: 24px;
   }
