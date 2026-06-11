@@ -882,10 +882,16 @@ function getOrderItemTimerStopAt(item) {
     : null;
 }
 
-function getOrderItemElapsedTime(item, fallbackReceivedAt = Date.now()) {
-  const receivedAt = Number.isFinite(item?.receivedAt) ? item.receivedAt : fallbackReceivedAt;
+function getOrderItemTimerStartAt(item) {
+  return Number.isFinite(item?.sharedAt) ? item.sharedAt : null;
+}
+
+function getOrderItemElapsedTime(item) {
+  const startedAt = getOrderItemTimerStartAt(item);
+  if (!Number.isFinite(startedAt)) return formatElapsedTime(0);
+
   const stoppedAt = getOrderItemTimerStopAt(item);
-  return formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : Date.now()) - receivedAt);
+  return formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : Date.now()) - startedAt);
 }
 
 function getTableVisualState(tableNumber, { publishedOnly = false } = {}) {
@@ -1055,7 +1061,7 @@ async function supabaseRequest(path, { method = "GET", query = {}, body, prefer 
   return JSON.parse(responseText);
 }
 
-function mapDbOrderItem(row) {
+function mapDbOrderItem(row, orderSharedAt = null) {
   const acceptance =
     row.acceptance_status === "pending"
       ? null
@@ -1068,6 +1074,8 @@ function mapDbOrderItem(row) {
           : null;
   const deliveredAt = fromSupabaseTimestamp(row.delivered_at);
   const savedCaptainDeliveredAt = fromSupabaseTimestamp(row.captain_delivered_at);
+  const itemSharedAt = fromSupabaseTimestamp(row.shared_at);
+  const sharedAt = Number.isFinite(orderSharedAt) ? orderSharedAt : itemSharedAt;
   const captainDeliveredAt =
     savedCaptainDeliveredAt ??
     (row.status === "delivered" && acceptance === "delivered" && Number.isFinite(deliveredAt)
@@ -1080,8 +1088,8 @@ function mapDbOrderItem(row) {
     quantity: Number(row.quantity) || 1,
     note: row.note || "",
     acceptance,
-    receivedAt: fromSupabaseTimestamp(row.received_at) ?? Date.now(),
-    sharedAt: fromSupabaseTimestamp(row.shared_at),
+    receivedAt: sharedAt ?? fromSupabaseTimestamp(row.received_at) ?? Date.now(),
+    sharedAt,
     outAt: fromSupabaseTimestamp(row.out_at),
     rejectedAt: fromSupabaseTimestamp(row.rejected_at),
     deliveredAt,
@@ -1117,12 +1125,12 @@ function getTableNumberFromOrderRow(row) {
   );
 }
 
-function mapDbOrderItems(orderItems) {
+function mapDbOrderItems(orderItems, orderSharedAt = null) {
   return Array.isArray(orderItems)
     ? orderItems
         .slice()
         .sort((left, right) => (Number(left.sort_order) || 0) - (Number(right.sort_order) || 0))
-        .map(mapDbOrderItem)
+        .map((item) => mapDbOrderItem(item, orderSharedAt))
     : [];
 }
 
@@ -1265,7 +1273,7 @@ async function hydrateOrdersFromDatabase() {
     const tableNumber = getTableNumberFromOrderRow(row);
     if (!Number.isFinite(tableNumber)) continue;
 
-    const orderItems = mapDbOrderItems(row.order_items);
+    const orderItems = mapDbOrderItems(row.order_items, fromSupabaseTimestamp(row.shared_at));
 
     if (orderItems.length > 0) {
       tableOrders.set(tableNumber, orderItems);
@@ -1793,14 +1801,11 @@ function shareOrder() {
   if (!state.order.length) return;
 
   const sharedAt = Date.now();
-  state.order = state.order.map((item) =>
-    isPublishedOrderItem(item)
-      ? item
-      : {
-          ...item,
-          sharedAt,
-        },
-  );
+  state.order = state.order.map((item) => ({
+    ...item,
+    receivedAt: sharedAt,
+    sharedAt,
+  }));
   renderMenu();
   renderCaptain();
   renderSousChef();
@@ -2267,7 +2272,7 @@ function buildTicketCardMarkup(ticketData, selectedCategory) {
                   <div class="ticket-card__qty">${escapeHtml(String(item.quantity))}</div>
                   ${buildCategoryTicketAcceptanceMarkup(item, rowTableNumber, rowIndex, readOnly)}
                   <div class="ticket-card__time" data-ticket-time>
-                    ${escapeHtml(getOrderItemElapsedTime(item, rowReceivedAt))}
+                    ${escapeHtml(getOrderItemElapsedTime(item))}
                   </div>
                 </div>
                 ${
@@ -3147,15 +3152,21 @@ function updateAdminTicketTimers() {
 function renderAdmin() {
   if (!elements.adminMain || !elements.adminSidebar) return;
   const isPaymentDetail = state.adminView === "payment-detail";
+  const isTableDetail = state.adminView === "table-detail";
 
   if (elements.adminTitle) {
     elements.adminTitle.textContent = getAdminTitle();
   }
 
   if (elements.adminBackButton) {
+    const backLabel = isPaymentDetail
+      ? "Back to payments"
+      : isTableDetail
+        ? "Back to table overview"
+        : "Back to home";
     elements.adminBackButton.setAttribute(
       "aria-label",
-      isPaymentDetail ? "Back to payments" : "Back to home",
+      backLabel,
     );
   }
 
@@ -3686,7 +3697,7 @@ function buildBillRowsMarkup() {
   return state.order
     .map((item, index) => {
       const receivedAt = Number.isFinite(item.receivedAt) ? item.receivedAt : Date.now();
-      const elapsedTime = getOrderItemElapsedTime(item, receivedAt);
+      const elapsedTime = getOrderItemElapsedTime(item);
       const isEditing = index === state.editingOrderIndex;
       const acceptanceState = item.acceptance === "out"
         ? "out"
@@ -3912,9 +3923,14 @@ function updateBillTimers() {
 
     const itemIndex = Number(billItem.dataset.billIndex);
     const orderItem = state.order[itemIndex];
-    const receivedAt = Number.isFinite(orderItem?.receivedAt) ? orderItem.receivedAt : now;
+    const startedAt = getOrderItemTimerStartAt(orderItem);
+    if (!Number.isFinite(startedAt)) {
+      timeElement.textContent = formatElapsedTime(0);
+      return;
+    }
+
     const stoppedAt = getOrderItemTimerStopAt(orderItem);
-    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
+    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - startedAt);
   });
 }
 
@@ -4024,7 +4040,7 @@ function buildCaptainDeliveryRowsMarkup() {
     .map((item, index) => {
       const receivedAt = Number.isFinite(item.receivedAt) ? item.receivedAt : Date.now();
       const stoppedAt = getOrderItemTimerStopAt(item);
-      const elapsedTime = getOrderItemElapsedTime(item, receivedAt);
+      const elapsedTime = getOrderItemElapsedTime(item);
       const deliveryState = getCaptainDeliveryItemState(item, index);
       const itemClassName = [
         "captain-delivery__item",
@@ -4095,9 +4111,14 @@ function updateCaptainDeliveryTimers() {
     const rowElement = timeElement.closest("[data-captain-delivery-index]");
     const itemIndex = Number(rowElement?.dataset.captainDeliveryIndex);
     const orderItem = state.order[itemIndex];
-    const receivedAt = Number.isFinite(orderItem?.receivedAt) ? orderItem.receivedAt : now;
+    const startedAt = getOrderItemTimerStartAt(orderItem);
+    if (!Number.isFinite(startedAt)) {
+      timeElement.textContent = formatElapsedTime(0);
+      return;
+    }
+
     const stoppedAt = getOrderItemTimerStopAt(orderItem);
-    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - receivedAt);
+    timeElement.textContent = formatElapsedTime((Number.isFinite(stoppedAt) ? stoppedAt : now) - startedAt);
   });
 }
 
@@ -4571,6 +4592,11 @@ for (const button of elements.navButtons) {
     if (target === "home") {
       if (state.page === "admin" && state.adminView === "payment-detail") {
         setRoute("admin-payments", state.tableNumber);
+        return;
+      }
+
+      if (state.page === "admin" && state.adminView === "table-detail") {
+        setRoute("admin-tables", state.tableNumber);
         return;
       }
 
