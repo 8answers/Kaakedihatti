@@ -1599,6 +1599,11 @@ function loadOrderForTable(tableNumber) {
   }));
 }
 
+function syncActiveOrderForTable(tableNumber) {
+  if (state.tableNumber !== tableNumber || !isOrderRoute(state.page)) return;
+  loadOrderForTable(tableNumber);
+}
+
 function showPage(pageName) {
   for (const [name, page] of pages.entries()) {
     page.hidden = name !== pageName;
@@ -3367,6 +3372,7 @@ function setTicketAcceptance(tableNumber, index, acceptance) {
   }
 
   state.tableOrders.set(tableNumber, orderItems);
+  syncActiveOrderForTable(tableNumber);
   const snapshot = cloneOrderItems(orderItems);
   enqueueDatabaseWrite(() => persistOrderToDatabase(tableNumber, snapshot));
 }
@@ -3379,6 +3385,16 @@ function clearTicketsActionState() {
 }
 
 function renderKitchenStatusDependents() {
+  if (state.page === "menu") {
+    renderMenu();
+  } else if (state.page === "bill") {
+    renderBill();
+  } else if (state.page === "captain-bill") {
+    renderCaptainBill();
+  } else if (state.page === "captain-delivery") {
+    renderCaptainDelivery();
+  }
+
   renderCaptain();
   renderAdmin();
   renderSousChef();
