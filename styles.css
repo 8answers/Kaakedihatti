@@ -48,7 +48,8 @@ body.modal-open {
 
 .topbar--captain,
 .topbar--menu,
-.topbar--admin {
+.topbar--admin,
+.topbar--login {
   gap: 16px;
 }
 

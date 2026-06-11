@@ -28,17 +28,27 @@
               Captain
             </button>
             <button class="role-button" type="button" data-nav="sous-chef">
-              (Sous Chef/Expeditor)
+              Kitchen Supervisor
             </button>
+            <!--
             <button class="role-button" type="button" data-nav="cashier">
               Cashier
             </button>
+            -->
           </div>
         </main>
       </section>
 
       <section class="screen" data-page="login" hidden>
-        <header class="topbar" aria-label="Home">
+        <header class="topbar topbar--login" aria-label="Home">
+          <button
+            class="topbar__icon-button"
+            type="button"
+            data-nav="home"
+            aria-label="Back to home"
+          >
+            <span class="topbar__icon" aria-hidden="true">‹</span>
+          </button>
           <span class="topbar__title">Home</span>
         </header>
 
@@ -188,7 +198,7 @@
       </section>
 
       <section class="screen screen--sous-chef" data-page="sous-chef" hidden>
-        <header class="topbar topbar--captain" aria-label="Table Overview (Sous Chef/Expeditor)">
+        <header class="topbar topbar--captain" aria-label="Table Overview (Kitchen Supervisor)">
           <button
             class="topbar__icon-button"
             type="button"
@@ -197,9 +207,9 @@
           >
             <span class="topbar__icon" aria-hidden="true">‹</span>
           </button>
-          <span class="topbar__title topbar__title--mixed" aria-label="Table Overview (Sous Chef/Expeditor)">
+          <span class="topbar__title topbar__title--mixed" aria-label="Table Overview (Kitchen Supervisor)">
             <span class="topbar__title-strong">Table Overview</span>
-            <span> (Sous Chef/Expeditor)</span>
+            <span> (Kitchen Supervisor)</span>
           </span>
         </header>
 
@@ -266,7 +276,7 @@
       </section>
 
       <section class="screen screen--tickets" data-page="tickets" hidden>
-        <header class="topbar topbar--captain" aria-label="Tickets Overview (Sous Chef/Expeditor)">
+        <header class="topbar topbar--captain" aria-label="Tickets Overview (Kitchen Supervisor)">
           <button
             class="topbar__icon-button"
             type="button"
@@ -275,9 +285,9 @@
           >
             <span class="topbar__icon" aria-hidden="true">‹</span>
           </button>
-          <span class="topbar__title topbar__title--mixed" aria-label="Tickets Overview (Sous Chef/Expeditor)">
+          <span class="topbar__title topbar__title--mixed" aria-label="Tickets Overview (Kitchen Supervisor)">
             <span class="topbar__title-strong">Tickets Overview</span>
-            <span> (Sous Chef/Expeditor)</span>
+            <span> (Kitchen Supervisor)</span>
           </span>
         </header>
 

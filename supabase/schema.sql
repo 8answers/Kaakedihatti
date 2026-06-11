@@ -5,7 +5,6 @@ begin
     'captain',
     'cashier',
     'kitchen_supervisor',
-    'sous_chef',
     'staff'
   );
 exception
@@ -13,7 +12,6 @@ exception
 end $$;
 
 alter type restaurant_role add value if not exists 'kitchen_supervisor';
-alter type restaurant_role add value if not exists 'sous_chef';
 alter type restaurant_role add value if not exists 'staff';
 alter type restaurant_role add value if not exists 'cashier';
 
@@ -336,7 +334,7 @@ set display_name = excluded.display_name,
 insert into users (full_name, role, username, password, is_active)
 values
   ('Admin', 'admin', 'admin', '12345', true),
-  ('Abc XyZ', 'sous_chef', 'ab@kdh', '12345', true)
+  ('Abc XyZ', 'kitchen_supervisor', 'ab@kdh', '12345', true)
 on conflict (username) do update
 set full_name = excluded.full_name,
     role = excluded.role,
